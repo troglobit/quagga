@@ -242,9 +242,11 @@ cpu_record_hash_alloc (struct cpu_thread_history *a)
 static void
 cpu_record_hash_free (void *a)
 {
+  char *funcname;
   struct cpu_thread_history *hist = a;
  
-  XFREE (MTYPE_THREAD_FUNCNAME, hist->funcname);
+  funcname = (char *)hist->funcname;
+  XFREE (MTYPE_THREAD_FUNCNAME, funcname);
   XFREE (MTYPE_THREAD_STATS, hist);
 }
 
