@@ -89,7 +89,7 @@ foreach (@ARGV) {
 	$cmd =~ s/\s+$//g;
 
         # $protocol is VTYSH_PROTO format for redirection of user input
-    	if ($file =~ /lib/) {
+    	if ($file =~ /\/lib\//) {
            if ($file =~ /keychain.c/) {
               $protocol = "VTYSH_RIPD";
            }
