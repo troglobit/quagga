@@ -617,8 +617,8 @@ zprivs_init(struct zebra_privs_t *zprivs)
       else
         {
           /* cant use log.h here as it depends on vty */
-          fprintf (stderr, "privs_init: could not lookup user %s\n",
-                   zprivs->user);
+          fprintf (stderr, "privs_init: could not lookup user %s: %s\n",
+                   zprivs->user, safe_strerror (errno));
           exit (1);
         }
     }
@@ -628,7 +628,7 @@ zprivs_init(struct zebra_privs_t *zprivs)
   if (zprivs->vty_group)
     /* Add the vty_group to the supplementary groups so it can be chowned to */
     {
-      if ( (grentry = getgrnam (zprivs->vty_group)) )
+       if ( (grentry = getgrnam (zprivs->vty_group)) )
         {
           zprivs_state.vtygrp = grentry->gr_gid;
           if ( setgroups (1, &zprivs_state.vtygrp) )
@@ -640,8 +640,8 @@ zprivs_init(struct zebra_privs_t *zprivs)
         }
       else
         {
-          fprintf (stderr, "privs_init: could not lookup vty group %s\n",
-                   zprivs->vty_group);
+          fprintf (stderr, "privs_init: could not lookup vty group %s: %s\n",
+                   zprivs->vty_group, safe_strerror (errno));
           exit (1);
         }
     }
@@ -654,15 +654,15 @@ zprivs_init(struct zebra_privs_t *zprivs)
         }
       else
         {
-          fprintf (stderr, "privs_init: could not lookup group %s\n",
-                   zprivs->group);
+          fprintf (stderr, "privs_init: could not lookup group %s: %s\n",
+                   zprivs->group, safe_strerror (errno));
           exit (1);
         }
       /* change group now, forever. uid we do later */
       if ( setregid (zprivs_state.zgid, zprivs_state.zgid) )
         {
-          fprintf (stderr, "zprivs_init: could not setregid, %s\n",
-                    safe_strerror (errno) );
+          fprintf (stderr, "zprivs_init: could not setregid, %s: %s\n",
+                    safe_strerror (errno), safe_strerror (errno));
           exit (1);
         }
     }
