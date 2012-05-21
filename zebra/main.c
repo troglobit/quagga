@@ -63,6 +63,9 @@ int keep_kernel_mode = 0;
 u_int32_t nl_rcvbufsize = 0;
 #endif /* HAVE_NETLINK */
 
+/* Manage connected routes */
+extern int set_interface_mode;
+
 /* Command line options. */
 struct option longopts[] = 
 {
@@ -82,6 +85,7 @@ struct option longopts[] =
   { "user",        required_argument, NULL, 'u'},
   { "group",       required_argument, NULL, 'g'},
   { "version",     no_argument,       NULL, 'v'},
+  { "system",      no_argument,       NULL, 'S'},
   { 0 }
 };
 
@@ -133,6 +137,7 @@ usage (char *progname, int status)
 	      "-C, --dryrun       Check configuration for validity and exit\n"\
 	      "-A, --vty_addr     Set vty's bind address\n"\
 	      "-P, --vty_port     Set vty's port number\n"\
+	      "-S, --system       Manage all routes on link transitions\n" \
 	      "-r, --retain       When program terminates, retain added route "\
 				  "by zebra.\n"\
 	      "-u, --user         User to run as\n"\
@@ -229,9 +234,9 @@ main (int argc, char **argv)
       int opt;
   
 #ifdef HAVE_NETLINK  
-      opt = getopt_long (argc, argv, "bdkf:i:hA:P:ru:g:vs:C", longopts, 0);
+      opt = getopt_long (argc, argv, "bdklf:i:hA:P:ru:g:vs:CS", longopts, 0);
 #else
-      opt = getopt_long (argc, argv, "bdkf:i:hA:P:ru:g:vC", longopts, 0);
+      opt = getopt_long (argc, argv, "bdklf:i:hA:P:ru:g:vCS", longopts, 0);
 #endif /* HAVE_NETLINK */
 
       if (opt == EOF)
@@ -248,6 +253,9 @@ main (int argc, char **argv)
 	  break;
 	case 'k':
 	  keep_kernel_mode = 1;
+	  break;
+	case 'S':
+	  set_interface_mode = 1;
 	  break;
 	case 'C':
 	  dryrun = 1;
