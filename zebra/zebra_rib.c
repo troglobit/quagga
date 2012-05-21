@@ -1109,20 +1109,6 @@ rib_process (struct route_node *rn)
         }
       else if (rib_is_managed (select))
         {
-          /* Housekeeping code to deal with 
-             race conditions in kernel with linux
-             netlink reporting interface up before IPv4 or IPv6 protocol
-             is ready to add routes.
-             This makes sure the routes are IN the kernel.
-           */
-
-          for (nexthop = select->nexthop; nexthop; nexthop = nexthop->next)
-            if (CHECK_FLAG (nexthop->flags, NEXTHOP_FLAG_FIB))
-            {
-              installed = 1;
-              break;
-            }
-          if (! installed) 
             rib_install_kernel (rn, select);
         }
       goto end;
