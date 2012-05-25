@@ -74,6 +74,7 @@ struct zebra_privs_t ospfd_privs =
 
 /* Configuration filename and directory. */
 char config_default[] = SYSCONFDIR OSPF_DEFAULT_CONFIG;
+char *config_file = NULL;
 
 /* OSPFd options. */
 struct option longopts[] = 
@@ -138,6 +139,12 @@ static void
 sighup (void)
 {
   zlog (NULL, LOG_INFO, "SIGHUP received");
+
+  /* Flush old settings */
+  ospf_flush ();
+
+  /* Re-read configuration */
+  vty_read_config (config_file, config_default);
 }
 
 /* SIGINT / SIGTERM handler. */
@@ -183,7 +190,6 @@ main (int argc, char **argv)
   char *vty_addr = NULL;
   int vty_port = OSPF_VTY_PORT;
   int daemon_mode = 0;
-  char *config_file = NULL;
   char *progname;
   struct thread thread;
   int dryrun = 0;

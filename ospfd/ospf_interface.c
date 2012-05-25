@@ -322,7 +322,8 @@ ospf_if_free (struct ospf_interface *oi)
   
   list_free (oi->ls_ack);
   list_free (oi->ls_ack_direct.ls_ack);
-  
+
+  ospf_if_reset_params (oi);
   ospf_delete_from_if (oi->ifp, oi);
 
   listnode_delete (oi->ospf->oiflist, oi);
@@ -554,6 +555,27 @@ ospf_del_if_params (struct ospf_if_params *oip)
 {
   list_delete (oip->auth_crypt);
   XFREE (MTYPE_OSPF_IF_PARAMS, oip);
+}
+
+void
+ospf_if_reset_params (struct ospf_interface *oi)
+{
+  struct ospf_if_params *oip;
+
+  oip = IF_DEF_PARAMS (oi->ifp);
+  UNSET_IF_PARAM (oip, output_cost_cmd);
+  UNSET_IF_PARAM (oip, output_cost_cmd);
+  UNSET_IF_PARAM (oip, transmit_delay);
+  UNSET_IF_PARAM (oip, retransmit_interval);
+  UNSET_IF_PARAM (oip, passive_interface);
+  UNSET_IF_PARAM (oip, v_hello);
+  UNSET_IF_PARAM (oip, fast_hello);
+  UNSET_IF_PARAM (oip, v_wait);
+  UNSET_IF_PARAM (oip, priority);
+  UNSET_IF_PARAM (oip, type);
+  UNSET_IF_PARAM (oip, auth_simple);
+  UNSET_IF_PARAM (oip, auth_crypt);
+  UNSET_IF_PARAM (oip, auth_type);
 }
 
 void

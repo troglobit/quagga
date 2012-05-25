@@ -596,6 +596,7 @@ extern void ospf_init (void);
 extern void ospf_if_update (struct ospf *, struct interface *);
 extern void ospf_ls_upd_queue_empty (struct ospf_interface *);
 extern void ospf_terminate (void);
+extern void ospf_flush (void);
 extern void ospf_nbr_nbma_if_update (struct ospf *, struct ospf_interface *);
 extern struct ospf_nbr_nbma *ospf_nbr_nbma_lookup (struct ospf *,
 						   struct in_addr);

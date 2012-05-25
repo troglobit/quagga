@@ -354,6 +354,19 @@ ospf_deferred_shutdown_check (struct ospf *ospf)
                  timeout);
   return;
 }
+
+void
+ospf_flush (void)
+{
+   struct ospf *ospf;
+   struct listnode *node, *nnode;
+
+   for (ALL_LIST_ELEMENTS (om->ospf, node, nnode, ospf))
+     {
+       ospf_finish_final (ospf);
+     }
+}
+
 
 /* Shut down the entire process */
 void

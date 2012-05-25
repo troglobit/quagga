@@ -272,7 +272,7 @@ extern struct ospf_if_params *ospf_get_if_params (struct interface *,
 extern void ospf_del_if_params (struct ospf_if_params *);
 extern void ospf_free_if_params (struct interface *, struct in_addr);
 extern void ospf_if_update_params (struct interface *, struct in_addr);
-
+extern void ospf_if_reset_params (struct ospf_interface *oi);
 extern int ospf_if_new_hook (struct interface *);
 extern void ospf_if_init (void);
 extern void ospf_if_stream_set (struct ospf_interface *);
