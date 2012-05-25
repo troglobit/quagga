@@ -2089,7 +2089,8 @@ ospf_ls_ack (struct ip *iph, struct ospf_header *ospfh,
 
       lsr = ospf_ls_retransmit_lookup (nbr, lsa);
 
-      if (lsr != NULL && lsr->data->ls_seqnum == lsa->data->ls_seqnum)
+      if (lsr != NULL && lsr->data->ls_seqnum == lsa->data->ls_seqnum &&
+          (ntohs (lsr->data->ls_age) >= OSPF_LSA_MAXAGE) == (ntohs (lsr->data->ls_age) >= OSPF_LSA_MAXAGE))
         {
 #ifdef HAVE_OPAQUE_LSA
           if (IS_OPAQUE_LSA (lsr->data->type))
