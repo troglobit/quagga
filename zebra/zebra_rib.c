@@ -44,6 +44,9 @@
 /* Default rtm_table for all clients */
 extern struct zebra_t zebrad;
 
+/* Should kernel routes be removed on link down? */
+int set_interface_mode;
+
 /* Hold time for RIB process, should be very minimal.
  * it is useful to able to set it otherwise for testing, hence exported
  * as global here for test-rig code.
@@ -765,6 +768,15 @@ rib_match_ipv6 (struct in6_addr *addr)
 #define RIB_SYSTEM_ROUTE(R) \
         ((R)->type == ZEBRA_ROUTE_KERNEL || (R)->type == ZEBRA_ROUTE_CONNECT)
 
+static inline int rib_is_managed(const struct rib *rib)
+{
+  switch (rib->type) {
+  case ZEBRA_ROUTE_KERNEL:    	return 0;
+  case ZEBRA_ROUTE_CONNECT:	return set_interface_mode;
+  default:			return 1;
+  }
+}
+
 /* This function verifies reachability of one given nexthop, which can be
  * numbered or unnumbered, IPv4 or IPv6. The result is unconditionally stored
  * in nexthop->flags field. If the 4th parameter, 'set', is non-zero,
@@ -967,7 +979,7 @@ rib_uninstall (struct route_node *rn, struct rib *rib)
   if (CHECK_FLAG (rib->flags, ZEBRA_FLAG_SELECTED))
     {
       redistribute_delete (&rn->p, rib);
-      if (! RIB_SYSTEM_ROUTE (rib))
+      if (rib_is_managed (rib))
 	rib_uninstall_kernel (rn, rib);
       UNSET_FLAG (rib->flags, ZEBRA_FLAG_SELECTED);
     }
@@ -1092,17 +1104,17 @@ rib_process (struct route_node *rn)
       if (CHECK_FLAG (select->flags, ZEBRA_FLAG_CHANGED))
         {
           redistribute_delete (&rn->p, select);
-          if (! RIB_SYSTEM_ROUTE (select))
+          if (rib_is_managed (select))
             rib_uninstall_kernel (rn, select);
 
           /* Set real nexthop. */
           nexthop_active_update (rn, select, 1);
   
-          if (! RIB_SYSTEM_ROUTE (select))
+          if (rib_is_managed (select))
             rib_install_kernel (rn, select);
           redistribute_add (&rn->p, select);
         }
-      else if (! RIB_SYSTEM_ROUTE (select))
+      else if (rib_is_managed (select))
         {
           /* Housekeeping code to deal with 
              race conditions in kernel with linux
@@ -1133,7 +1145,7 @@ rib_process (struct route_node *rn)
         zlog_debug ("%s: %s/%d: Removing existing route, fib %p", __func__,
           buf, rn->p.prefixlen, fib);
       redistribute_delete (&rn->p, fib);
-      if (! RIB_SYSTEM_ROUTE (fib))
+      if (rib_is_managed (fib))
 	rib_uninstall_kernel (rn, fib);
       UNSET_FLAG (fib->flags, ZEBRA_FLAG_SELECTED);
 
@@ -1153,7 +1165,7 @@ rib_process (struct route_node *rn)
       /* Set real nexthop. */
       nexthop_active_update (rn, select, 1);
 
-      if (! RIB_SYSTEM_ROUTE (select))
+      if (rib_is_managed (select))
         rib_install_kernel (rn, select);
       SET_FLAG (select->flags, ZEBRA_FLAG_SELECTED);
       redistribute_add (&rn->p, select);
@@ -1527,7 +1539,8 @@ int
 rib_add_ipv4 (int type, int flags, struct prefix_ipv4 *p, 
 	      struct in_addr *gate, struct in_addr *src,
 	      unsigned int ifindex, u_int32_t vrf_id,
-	      u_int32_t metric, u_char distance, safi_t safi)
+	      u_int32_t metric, u_int8_t distance, safi_t safi,
+	      u_int8_t scope, u_int8_t proto)
 {
   struct rib *rib;
   struct rib *same = NULL;
@@ -1568,6 +1581,11 @@ rib_add_ipv4 (int type, int flags, struct prefix_ipv4 *p,
       
       if (rib->type != type)
 	continue;
+
+      if (rib->type == ZEBRA_ROUTE_KERNEL &&
+	  (rib->metric != metric || rib->protocol != proto))
+	continue;
+
       if (rib->type != ZEBRA_ROUTE_CONNECT)
         {
           same = rib;
@@ -1593,6 +1611,8 @@ rib_add_ipv4 (int type, int flags, struct prefix_ipv4 *p,
   rib->table = vrf_id;
   rib->nexthop_num = 0;
   rib->uptime = time (NULL);
+  rib->scope = scope;
+  rib->protocol = proto;
 
   /* Nexthop settings. */
   if (gate)
@@ -1766,8 +1786,7 @@ void rib_lookup_and_pushup (struct prefix_ipv4 * p)
    */
   for (rib = rn->info; rib; rib = rib->next)
   {
-    if (CHECK_FLAG (rib->flags, ZEBRA_FLAG_SELECTED) &&
-      ! RIB_SYSTEM_ROUTE (rib))
+    if (CHECK_FLAG (rib->flags, ZEBRA_FLAG_SELECTED) && rib_is_managed (rib))
     {
       changed = 1;
       if (IS_ZEBRA_DEBUG_RIB)
@@ -2966,7 +2985,7 @@ rib_close_table (struct route_table *table)
     for (rn = route_top (table); rn; rn = route_next (rn))
       for (rib = rn->info; rib; rib = rib->next)
         {
-          if (! RIB_SYSTEM_ROUTE (rib)
+          if (rib_is_managed (rib)
 	      && CHECK_FLAG (rib->flags, ZEBRA_FLAG_SELECTED))
             rib_uninstall_kernel (rn, rib);
         }
@@ -2978,6 +2997,72 @@ rib_close (void)
 {
   rib_close_table (vrf_table (AFI_IP, SAFI_UNICAST, 0));
   rib_close_table (vrf_table (AFI_IP6, SAFI_UNICAST, 0));
+}
+
+/* When all IPV4 subnets are gone on Linux, the kernel frees all routes */
+void
+rib_flush_interface(afi_t afi, struct interface *ifp)
+{
+  struct route_table *table;
+  struct route_node *rn;
+  struct rib *rib, *next;
+
+  table = vrf_table(afi, SAFI_UNICAST, 0);
+  if (!table)
+    return;
+
+  if (IS_ZEBRA_DEBUG_RIB)
+    zlog_debug ("%s: flushing references to %s", __func__, ifp->name);
+
+  for (rn = route_top (table); rn; rn = route_next (rn))
+    for (rib = rn->info; rib; rib = next)
+      {
+	struct nexthop *nexthop;
+
+	next = rib->next;
+
+	if (CHECK_FLAG (rib->status, RIB_ENTRY_REMOVED))
+	  continue;
+
+	switch(rib->type) {
+	case ZEBRA_ROUTE_KERNEL:
+	  if ( (nexthop = rib->nexthop) &&
+	       (nexthop->type == NEXTHOP_TYPE_IPV4_IFINDEX ||
+		nexthop->type == NEXTHOP_TYPE_IFINDEX) &&
+	       nexthop->ifindex == ifp->ifindex)
+	    {
+	      if (IS_ZEBRA_DEBUG_RIB)
+		zlog_debug ("%s: calling rib_delnode (%p, %p) on kernel RIB entry",
+			    __func__, rn, rib);
+	      rib_delnode(rn, rib);
+	    }
+	  break;
+
+	case ZEBRA_ROUTE_STATIC:
+	  for (nexthop = rib->nexthop; nexthop; nexthop = nexthop->next)
+	    switch(nexthop->type)
+	      {
+	      case NEXTHOP_TYPE_IPV4:
+	      case NEXTHOP_TYPE_IPV6:
+	      case NEXTHOP_TYPE_IFINDEX:
+	      case NEXTHOP_TYPE_IPV4_IFINDEX:
+	      case NEXTHOP_TYPE_IPV6_IFINDEX:
+		if (nexthop->ifindex == ifp->ifindex)
+		  UNSET_FLAG (nexthop->flags, NEXTHOP_FLAG_FIB);
+		break;
+
+	      case NEXTHOP_TYPE_IFNAME:
+	      case NEXTHOP_TYPE_IPV4_IFNAME:
+	      case NEXTHOP_TYPE_IPV6_IFNAME:
+		if (strcmp(nexthop->ifname, ifp->name) == 0)
+		  UNSET_FLAG (nexthop->flags, NEXTHOP_FLAG_FIB);
+		break;
+
+	      case NEXTHOP_TYPE_BLACKHOLE:
+		break;
+	      }
+	}
+      }
 }
 
 /* Routing information base initialize. */
