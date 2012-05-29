@@ -728,9 +728,7 @@ static int
 rtm_read_mesg (struct rt_msghdr *rtm,
 	       union sockunion *dest,
 	       union sockunion *mask,
-	       union sockunion *gate,
-	       char *ifname,
-	       short *ifnlen)
+	       union sockunion *gate)
 {
   caddr_t pnt, end;
 
@@ -754,7 +752,6 @@ rtm_read_mesg (struct rt_msghdr *rtm,
   RTA_ADDR_GET (gate, RTA_GATEWAY, rtm->rtm_addrs, pnt);
   RTA_ATTR_GET (mask, RTA_NETMASK, rtm->rtm_addrs, pnt);
   RTA_ADDR_GET (NULL, RTA_GENMASK, rtm->rtm_addrs, pnt);
-  RTA_NAME_GET (ifname, RTA_IFP, rtm->rtm_addrs, pnt, *ifnlen);
   RTA_ADDR_GET (NULL, RTA_IFA, rtm->rtm_addrs, pnt);
   RTA_ADDR_GET (NULL, RTA_AUTHOR, rtm->rtm_addrs, pnt);
   RTA_ADDR_GET (NULL, RTA_BRD, rtm->rtm_addrs, pnt);
@@ -777,14 +774,12 @@ rtm_read (struct rt_msghdr *rtm)
   int flags;
   u_char zebra_flags;
   union sockunion dest, mask, gate;
-  char ifname[INTERFACE_NAMSIZ + 1];
-  short ifnlen = 0;
 
   zebra_flags = 0;
 
   /* Read destination and netmask and gateway from rtm message
      structure. */
-  flags = rtm_read_mesg (rtm, &dest, &mask, &gate, ifname, &ifnlen);
+  flags = rtm_read_mesg (rtm, &dest, &mask, &gate);
   if (!(flags & RTF_DONE))
     return;
   if (IS_ZEBRA_DEBUG_KERNEL)
