@@ -53,14 +53,24 @@ struct rib
   /* Uptime. */
   time_t uptime;
 
-  /* Type fo this route. */
-  int type;
-
   /* Which routing table */
-  int table;			
+  u_int32_t table;
 
   /* Metric */
   u_int32_t metric;
+
+  /* Type for this route. < ZEBRA_ROUTE_MAX */
+  u_int8_t type;
+
+  /* Scope for this route: RTM_UNIVERSE .. RTM_NOWHERE */
+  u_int8_t scope;
+
+  /* Routing protocol: RTPROT_UNSPEC .. */
+  u_int8_t protocol;
+
+  /* Status Flags for the *route_node*, but kept in the head RIB.. */
+  u_char rn_status;
+#define RIB_ROUTE_QUEUED(x)	(1 << (x))
 
   /* Distance. */
   u_char distance;
@@ -357,7 +367,8 @@ extern struct route_table *vrf_static_table (afi_t afi, safi_t safi, u_int32_t i
 extern int rib_add_ipv4 (int type, int flags, struct prefix_ipv4 *p, 
 			 struct in_addr *gate, struct in_addr *src,
 			 unsigned int ifindex, u_int32_t vrf_id,
-			 u_int32_t, u_char, safi_t);
+			 u_int32_t metric, u_int8_t distance, safi_t,
+			 u_int8_t scope, u_int8_t protocol);
 
 extern int rib_add_ipv4_multipath (struct prefix_ipv4 *, struct rib *, safi_t);
 
@@ -372,6 +383,8 @@ extern struct rib *rib_lookup_ipv4 (struct prefix_ipv4 *);
 extern void rib_update (void);
 extern void rib_weed_tables (void);
 extern void rib_sweep_route (void);
+struct interface;
+extern void rib_flush_interface (afi_t afi, struct interface *ifp);
 extern void rib_close (void);
 extern void rib_init (void);
 extern unsigned long rib_score_proto (u_char proto);
