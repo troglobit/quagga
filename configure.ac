@@ -189,6 +189,9 @@ AC_PROG_LIBTOOL
 dnl ----------------------
 dnl Packages configuration
 dnl ----------------------
+AC_ARG_WITH(pkg-extra-version,
+	AS_HELP_STRING([--with-pkg-extra-version=VER], [add extra version field, for packagers/distributions]),
+	[EXTRAVERSION=$withval],EXTRAVERSION=)
 AC_ARG_ENABLE(vtysh,
 [  --enable-vtysh          include integrated vty shell for Quagga])
 AC_ARG_ENABLE(ipv6,
@@ -383,6 +386,16 @@ case "${enable_multipath}" in
 esac
 
 AC_SUBST(MULTIPATH_NUM)
+
+dnl -----------------------------------
+dnl Add extra version string to package
+dnl name, string and version fields.
+dnl -----------------------------------
+if test "x${EXTRAVERSION}" != "x" ; then
+  VERSION=${VERSION}${EXTRAVERSION}
+  PACKAGE_VERSION=${PACKAGE_VERSION}${EXTRAVERSION}
+  PACKAGE_STRING=${PACKAGE_STRING}${EXTRAVERSION}
+fi
 
 dnl ------------------------------------
 dnl Check C keywords and standard  types
