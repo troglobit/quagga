@@ -189,58 +189,32 @@ AC_PROG_LIBTOOL
 dnl ----------------------
 dnl Packages configuration
 dnl ----------------------
-AC_ARG_WITH(pkg-extra-version,
-	AS_HELP_STRING([--with-pkg-extra-version=VER], [add extra version field, for packagers/distributions]),
-	[EXTRAVERSION=$withval],EXTRAVERSION=)
-AC_ARG_ENABLE(vtysh,
-[  --enable-vtysh          include integrated vty shell for Quagga])
-AC_ARG_ENABLE(ipv6,
-[  --disable-ipv6          turn off IPv6 related features and daemons])
-AC_ARG_ENABLE(doc,
-[  --disable-doc           do not build docs])
-AC_ARG_ENABLE(zebra,
-[  --disable-zebra         do not build zebra daemon])
-AC_ARG_ENABLE(bgpd,
-[  --disable-bgpd          do not build bgpd])
-AC_ARG_ENABLE(ripd,
-[  --disable-ripd          do not build ripd])
-AC_ARG_ENABLE(ripngd,
-[  --disable-ripngd        do not build ripngd])
-AC_ARG_ENABLE(ospfd,
-[  --disable-ospfd         do not build ospfd])
-AC_ARG_ENABLE(ospf6d,
-[  --disable-ospf6d        do not build ospf6d])
-AC_ARG_ENABLE(babeld,
-[  --disable-babeld        do not build babeld])
-AC_ARG_ENABLE(watchquagga,
-[  --disable-watchquagga   do not build watchquagga])
-AC_ARG_ENABLE(isisd,
-[  --enable-isisd          build isisd])
-AC_ARG_ENABLE(solaris,
-[  --enable-solaris          build solaris])
-AC_ARG_ENABLE(bgp-announce,
-[  --disable-bgp-announce, turn off BGP route announcement])
-AC_ARG_ENABLE(netlink,
-[  --enable-netlink        force to use Linux netlink interface])
-AC_ARG_ENABLE(broken-aliases,
-[  --enable-broken-aliases enable aliases as distinct interfaces for Linux 2.2.X])
+QUAGGA_ARG_WITH(pkg-extra-version, [add extra version field, for packagers/distributions],)
+QUAGGA_ARG_ENABLE(vtysh,           [include integrated vty shell for Quagga], [no])
+QUAGGA_ARG_DISABLE(ipv6,           [turn off IPv6 related features and daemons])
+QUAGGA_ARG_DISABLE(doc,            [do not build docs])
+QUAGGA_ARG_DISABLE(zebra,          [do not build zebra daemon])
+QUAGGA_ARG_DISABLE(bgpd,           [do not build bgpd])
+QUAGGA_ARG_DISABLE(ripd,           [do not build ripd])
+QUAGGA_ARG_DISABLE(ripngd,         [do not build ripngd])
+QUAGGA_ARG_DISABLE(ospfd,          [do not build ospfd])
+QUAGGA_ARG_DISABLE(ospf6d,         [do not build ospf6d])
+QUAGGA_ARG_DISABLE(babeld,         [do not build babeld])
+QUAGGA_ARG_DISABLE(watchquagga,    [do not build watchquagga])
+QUAGGA_ARG_ENABLE(isisd,           [build isisd], [no])
+QUAGGA_ARG_ENABLE(solaris,         [build solaris], [no])
+QUAGGA_ARG_DISABLE(bgp_announce,   [turn off BGP route announcement])
+QUAGGA_ARG_ENABLE(netlink,         [force to use Linux netlink interface], [no])
+QUAGGA_ARG_ENABLE(broken-aliases,  [enable aliases as distinct interfaces for Linux 2.2.X], [no])
 AC_ARG_WITH(crypto,
 [  --without-crypto        do not use libcrypto in SNMP])
-AC_ARG_ENABLE(snmp,
-[  --enable-snmp           enable SNMP support])
-AC_ARG_WITH(libpam,
-[  --with-libpam           use libpam for PAM support in vtysh])
-AC_ARG_ENABLE(tcp-zebra,
-[  --enable-tcp-zebra      enable TCP/IP socket connection between zebra and protocol daemon])
-AC_ARG_ENABLE(opaque-lsa,
-  AC_HELP_STRING([--disable-opaque-lsa],[do not build OSPF Opaque-LSA with OSPFAPI support (RFC2370)]))
-AC_ARG_ENABLE(ospfapi,
-[  --disable-ospfapi       do not build OSPFAPI to access the OSPF LSA Database])
-AC_ARG_ENABLE(ospfclient,
-[  --disable-ospfclient    do not build OSPFAPI client for OSPFAPI, 
-                          (this is the default if --disable-ospfapi is set)])
-AC_ARG_ENABLE(ospf-te,
-  AC_HELP_STRING([--disable-ospf-te],[disable Traffic Engineering Extension to OSPF]))
+QUAGGA_ARG_ENABLE(snmp,            [enable SNMP support], [no])
+QUAGGA_ARG_WITH(libpam,            [use libpam for PAM support in vtysh])
+QUAGGA_ARG_ENABLE(tcp-zebra,       [enable TCP/IP socket connection between zebra and protocol daemon], [no])
+QUAGGA_ARG_DISABLE(opaque-lsa,     [do not build OSPF Opaque-LSA with OSPFAPI support (RFC2370)])
+QUAGGA_ARG_DISABLE(ospfapi,        [do not build OSPFAPI to access the OSPF LSA Database])
+QUAGGA_ARG_DISABLE(ospfclient,     [do not build OSPFAPI client for OSPFAPI, (this is the default if --disable-ospfapi is set)])
+QUAGGA_ARG_DISABLE(ospf-te,        [disable Traffic Engineering Extension to OSPF])
 AC_ARG_ENABLE(multipath,
 [  --enable-multipath=ARG  enable multipath function, ARG must be digit])
 AC_ARG_ENABLE(user,
@@ -254,24 +228,15 @@ AC_ARG_ENABLE(configfile_mask,
 AC_ARG_ENABLE(logfile_mask,
 [  --enable-logfile-mask=ARG     set mask for log files])
 
-AC_ARG_ENABLE(rtadv,
-[  --disable-rtadv               disable IPV6 router advertisement feature])
-AC_ARG_ENABLE(irdp,
-[  --enable-irdp                 enable IRDP server support in zebra])
-AC_ARG_ENABLE(isis_topology,
-[  --enable-isis-topology        enable IS-IS topology generator])
-AC_ARG_ENABLE(capabilities,
-[  --disable-capabilities        disable using POSIX capabilities])
-AC_ARG_ENABLE(gcc_ultra_verbose,
-[  --enable-gcc-ultra-verbose    enable ultra verbose GCC warnings])
-AC_ARG_ENABLE(linux24_tcp_md5,
-[  --enable-linux24-tcp-md5  enable support for old, Linux-2.4 RFC2385 patch])
-AC_ARG_ENABLE(gcc-rdynamic,
-[  --enable-gcc-rdynamic   enable gcc linking with -rdynamic for better backtraces])
-AC_ARG_ENABLE(time-check,
-[  --disable-time-check          disable slow thread warning messages])
-AC_ARG_ENABLE(pcreposix,
-[  --enable-pcreposix          enable using PCRE Posix libs for regex functions])
+QUAGGA_ARG_DISABLE(rtadv,          [disable IPV6 router advertisement feature])
+QUAGGA_ARG_ENABLE(irdp,            [enable IRDP server support in zebra], [no])
+QUAGGA_ARG_ENABLE(isis_topology,   [enable IS-IS topology generator], [no])
+QUAGGA_ARG_DISABLE(capabilities,   [disable using POSIX capabilities])
+QUAGGA_ARG_ENABLE(gcc-ultra-verbose, [enable ultra verbose GCC warnings], [no])
+QUAGGA_ARG_ENABLE(linux24-tcp-md5, [enable support for old, Linux-2.4 RFC2385 patch], [no])
+QUAGGA_ARG_ENABLE(gcc-rdynamic,    [enable gcc linking with -rdynamic for better backtraces], [no])
+QUAGGA_ARG_DISBLE(time-check,      [disable slow thread warning messages])
+QUAGGA_ARG_ENABLE(pcreposix,       [enable using PCRE POSIX libraries for regex functions])
 
 if test x"${enable_gcc_ultra_verbose}" = x"yes" ; then
   CFLAGS="${CFLAGS} -W -Wcast-qual -Wstrict-prototypes"
@@ -391,10 +356,10 @@ dnl -----------------------------------
 dnl Add extra version string to package
 dnl name, string and version fields.
 dnl -----------------------------------
-if test "x${EXTRAVERSION}" != "x" ; then
-  VERSION=${VERSION}${EXTRAVERSION}
-  PACKAGE_VERSION=${PACKAGE_VERSION}${EXTRAVERSION}
-  PACKAGE_STRING=${PACKAGE_STRING}${EXTRAVERSION}
+if test -n ${with_pkg_extra_version}; then
+  VERSION=${VERSION}${with_pkg_extra_version}
+  PACKAGE_VERSION=${PACKAGE_VERSION}${with_pkg_extra_version}
+  PACKAGE_STRING=${PACKAGE_STRING}${with_pkg_extra_version}
 fi
 
 dnl ------------------------------------
@@ -1629,28 +1594,40 @@ AC_CONFIG_FILES([vtysh/extract.pl],[chmod +x vtysh/extract.pl])
 ## It's already in CVS until texinfo 4.7 is more common.
 AC_OUTPUT
 
-echo "
-Quagga configuration
---------------------
-quagga version          : ${PACKAGE_VERSION}
-host operating system  : ${host_os}
-source code location    : ${srcdir}
-compiler                : ${CC}
-compiler flags          : ${CFLAGS}
-make                    : ${MAKE-make}
-includes                : ${INCLUDES} ${SNMP_INCLUDES}
-linker flags            : ${LDFLAGS} ${LIBS} ${LIBCAP} ${LIBREADLINE} ${LIBM}
-state file directory    : ${quagga_statedir}
-config file directory   : `eval echo \`echo ${sysconfdir}\``
-example directory       : `eval echo \`echo ${exampledir}\``
-user to run as		: ${enable_user}
-group to run as		: ${enable_group}
-group for vty sockets	: ${enable_vty_group}
-config file mask        : ${enable_configfile_mask}
-log file mask           : ${enable_logfile_mask}
+cat << EOF
+------------------ Summary ------------------
+  Package                 : $PACKAGE_NAME
+  Pacakge version         : $PACKAGE_VERSION
+  host operating system   : ${host_os}
+  source code location    : ${srcdir}
+  compiler                : ${CC}
+  compiler flags          : ${CFLAGS}
+  make                    : ${MAKE-make}
+  includes                : ${INCLUDES} ${SNMP_INCLUDES}
+  linker flags            : ${LDFLAGS} ${LIBS} ${LIBCAP} ${LIBREADLINE} ${LIBM}
+  state file directory    : ${quagga_statedir}
+  config file directory   : `eval echo \`echo ${sysconfdir}\``
+  example directory       : `eval echo \`echo ${exampledir}\``
+  user to run as          : ${enable_user}
+  group to run as         : ${enable_group}
+  group for vty sockets   : ${enable_vty_group}
+  config file mask        : ${enable_configfile_mask}
+  log file mask           : ${enable_logfile_mask}
+
+Optional features:
+  Netlink                 : ${enable_netlink}
+  ZEBRA                   : ${enable_zebra}
+  BGP                     : ${enable_bgpd}
+  RIP                     : ${enable_ripd}
+  RIPNG                   : ${enable_ripngd}
+  OSPF                    : ${enable_ospfd}
+  OSPF6                   : ${enable_ospf6d}
+  ISIS                    : ${enable_isisd}
+  BABEL                   : ${enable_babeld}
 
 The above user and group must have read/write access to the state file
-directory and to the config files in the config file directory."
+directory and to the config files in the config file directory.
+EOF
 
 if test x"$quagga_cv_gnu_make" = x"no"; then echo "
 Warning: The ${MAKE-make} programme detected, either in your path or
