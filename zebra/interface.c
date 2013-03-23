@@ -381,7 +381,6 @@ if_delete_update (struct interface *ifp)
   struct prefix *p;
   struct route_node *rn;
   struct zebra_if *zebra_if;
-  struct route_table *table;
 
   zebra_if = ifp->info;
 
@@ -481,28 +480,6 @@ if_delete_update (struct interface *ifp)
 	  else
 	    {
 	      last = node;
-	    }
-	}
-    }
-
-  /* Delete routes that are via this interface */
-  if ((table = vrf_table (AFI_IP, SAFI_UNICAST, 0)) != NULL)
-    {
-      struct route_node *rn;
-      for (rn = route_top (table); rn; rn = route_next (rn))
-	{
-	  struct rib *rib;
-	  for (rib = rn->info; rib; rib = rib->next)
-	    {
-	      if (rib->nexthop && rib->nexthop->ifindex == ifp->ifindex)
-		{
-		  struct prefix_ipv4 p;
-		  p.family = AF_INET;
-		  p.prefix = rn->p.u.prefix4;
-		  p.prefixlen = rn->p.prefixlen;
-		  rib_delete_ipv4 (ZEBRA_ROUTE_KERNEL, 0, &p, NULL,
-				   ifp->ifindex, 0, SAFI_UNICAST);
-		}
 	    }
 	}
     }
