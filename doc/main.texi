@@ -66,6 +66,16 @@ address as a distinct subnet.
 Set description for the interface.
 @end deffn
 
+@deffn {Interface Command} {mtu <68-16436>} {}
+@deffnx {Interface Command} {no mtu} {}
+Adjust maximum packet size or maximum transmission unit, MTU, size for
+the interface.  The actual max varies depending on the interface type,
+e.g., loopback is usually 16436 and gigabit interfaces often support
+jumbo frames, up to 9000 bytes.  However, 1500 is usually the default.
+
+Use the no form of the command to restore the default value.
+@end deffn
+
 @deffn {Interface Command} {multicast} {}
 @deffnx {Interface Command} {no multicast} {}
 Enable or disables multicast flag for the interface.

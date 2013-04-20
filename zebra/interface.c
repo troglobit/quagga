@@ -967,6 +967,69 @@ DEFUN (show_interface_desc,
   return CMD_SUCCESS;
 }
 
+DEFUN (mtu_set,
+       mtu_set_cmd,
+       "mtu <68-16436>",
+       "Set MTU, usually 1500 for Ethernet, 16436 for loopback\n")
+{
+  int mtu, max;
+  struct interface *ifp;
+  struct zebra_if *if_data;
+
+  ifp = (struct interface *)vty->index;
+  max = if_default_mtu (ifp);
+
+  mtu = strtol (argv[0], NULL, 10);
+  if (mtu < 68 || mtu > max)
+    {
+      vty_out (vty, "MTU %d is invalid for this interface [68, %d]%s",
+               mtu, max, VTY_NEWLINE);
+      return CMD_WARNING;
+    }
+
+  if (CHECK_FLAG (ifp->status, ZEBRA_INTERFACE_ACTIVE))
+    {
+      if (if_set_mtu (ifp, mtu) < 0)
+        {
+          vty_out (vty, "Can't set MTU%s", VTY_NEWLINE);
+          return CMD_WARNING;
+        }
+    }
+
+  if_data = ifp->info;
+  if_data->mtu = mtu;
+
+  return CMD_SUCCESS;
+}
+
+DEFUN (no_mtu_set,
+       no_mtu_set_cmd,
+       "no mtu",
+       NO_STR
+       "Reset MTU to default for interface\n")
+{
+  int mtu;
+  struct interface *ifp;
+  struct zebra_if *if_data;
+
+  ifp = (struct interface *)vty->index;
+  mtu = if_default_mtu (ifp);
+
+  if (CHECK_FLAG (ifp->status, ZEBRA_INTERFACE_ACTIVE))
+    {
+      if (if_set_mtu (ifp, mtu) < 0)
+        {
+          vty_out (vty, "Can't restore default MTU (%d)%s", VTY_NEWLINE, mtu);
+          return CMD_WARNING;
+        }
+    }
+
+  if_data = ifp->info;
+  if_data->mtu = 0;
+
+  return CMD_SUCCESS;
+}
+
 DEFUN (multicast,
        multicast_cmd,
        "multicast",
@@ -1587,6 +1650,9 @@ if_config_write (struct vty *vty)
 
       if (if_data)
 	{
+          if (if_data->mtu != 0)
+            vty_out(vty, " mtu %u%s", if_data->mtu, VTY_NEWLINE);
+
 	  if (if_data->shutdown == IF_ZEBRA_SHUTDOWN_ON)
 	    vty_out (vty, " shutdown%s", VTY_NEWLINE);
 
@@ -1629,6 +1695,8 @@ zebra_if_init (void)
   install_default (INTERFACE_NODE);
   install_element (INTERFACE_NODE, &interface_desc_cmd);
   install_element (INTERFACE_NODE, &no_interface_desc_cmd);
+  install_element (INTERFACE_NODE, &mtu_set_cmd);
+  install_element (INTERFACE_NODE, &no_mtu_set_cmd);
   install_element (INTERFACE_NODE, &multicast_cmd);
   install_element (INTERFACE_NODE, &no_multicast_cmd);
   install_element (INTERFACE_NODE, &linkdetect_cmd);

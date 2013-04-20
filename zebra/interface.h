@@ -184,6 +184,9 @@ struct rtadvconf
 /* `zebra' daemon local interface structure. */
 struct zebra_if
 {
+  /* MTU configuration. */
+  unsigned int mtu;
+
   /* Shutdown configuration. */
   u_char shutdown;
 

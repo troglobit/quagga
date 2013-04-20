@@ -5,6 +5,7 @@
 #include "zebra/ioctl.h"
 
 void ifreq_set_name (struct ifreq *a, struct interface *b) { return; }
+int if_set_mtu (struct interface *ifp, int mtu) { return 0; }
 
 int if_set_prefix (struct interface *a, struct connected *b)
 { 

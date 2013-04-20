@@ -137,6 +137,58 @@ if_get_metric (struct interface *ifp)
 #endif /* SIOCGIFMETRIC */
 }
 
+/* set interface MTU */
+int
+if_set_mtu (struct interface *ifp, int mtu)
+{
+  struct ifreq ifreq;
+
+  ifreq_set_name (&ifreq, ifp);
+
+#if defined(SIOCGIFDATA)
+  if (if_ioctl (SIOCGIFDATA, (caddr_t) &ifreq) < 0)
+    {
+      zlog (NULL, LOG_INFO, "Can't lookup mtu by ioctl(SIOCGIFDATA)");
+      return -1;
+    }
+
+  ((struct if_data *)ifreq.ifr_data)->ifi_mtu = mtu;
+  if (if_ioctl (SIOCSIFDATA, (caddr_t) &ifreq) < 0)
+    {
+      zlog (NULL, LOG_INFO, "Can't set mtu by ioctl(SIOCSIFDATA)");
+      return -1;
+    }
+
+  ifp->mtu = mtu;
+
+#elif defined(SIOCGIFMTU)
+  if (if_ioctl (SIOCGIFMTU, (caddr_t) &ifreq) < 0)
+    {
+      zlog_info ("Can't lookup mtu by ioctl(SIOCGIFMTU)");
+      return -1;
+    }
+
+#ifdef SUNOS_5
+  ifreq.ifr_metric = mtu;
+#else
+  ifreq.ifr_mtu = mtu;
+#endif
+
+  if (if_ioctl (SIOCSIFMTU, (caddr_t) &ifreq) < 0)
+    {
+      zlog_info ("Can't set mtu by ioctl(SIOCSIFMTU)");
+      return -1;
+    }
+
+  ifp->mtu = mtu;
+
+#else
+  zlog (NULL, LOG_INFO, "Can't set mtu on this system");
+#endif
+
+  return 0;
+}
+
 /* get interface MTU */
 void
 if_get_mtu (struct interface *ifp)
