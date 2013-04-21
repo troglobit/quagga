@@ -223,12 +223,9 @@ extern void if_flags_update (struct interface *, uint64_t);
 extern int if_subnet_add (struct interface *, struct connected *);
 extern int if_subnet_delete (struct interface *, struct connected *);
 
-#ifdef HAVE_PROC_NET_DEV
 extern void ifstat_update_proc (void);
-#endif /* HAVE_PROC_NET_DEV */
 #ifdef HAVE_NET_RT_IFLIST
 extern void ifstat_update_sysctl (void);
-
 #endif /* HAVE_NET_RT_IFLIST */
 #ifdef HAVE_PROC_NET_DEV
 extern int interface_list_proc (void);
