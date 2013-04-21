@@ -190,12 +190,12 @@ sockunion_str2su (const char *str)
 static void
 sockunion_normalise_mapped (union sockunion *su)
 {
-  struct sockaddr_in sin;
-  
 #ifdef HAVE_IPV6
   if (su->sa.sa_family == AF_INET6 
       && IN6_IS_ADDR_V4MAPPED (&su->sin6.sin6_addr))
     {
+      struct sockaddr_in sin;
+
       memset (&sin, 0, sizeof (struct sockaddr_in));
       sin.sin_family = AF_INET;
       sin.sin_port = su->sin6.sin6_port;
@@ -529,14 +529,13 @@ sockopt_minttl (int family, int sock, int minttl)
 int
 sockopt_v6only (int family, int sock)
 {
-  int ret, on = 1;
-
 #ifdef HAVE_IPV6
 #ifdef IPV6_V6ONLY
   if (family == AF_INET6)
     {
-      ret = setsockopt (sock, IPPROTO_IPV6, IPV6_V6ONLY,
-			(void *) &on, sizeof (int));
+      int ret, on = 1;
+
+      ret = setsockopt (sock, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof (int));
       if (ret < 0)
 	{
 	  zlog (NULL, LOG_WARNING, "can't set sockopt IPV6_V6ONLY "
