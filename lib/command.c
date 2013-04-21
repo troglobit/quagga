@@ -847,11 +847,8 @@ cmd_ipv4_prefix_match (const char *str)
 static enum match_type
 cmd_ipv6_match (const char *str)
 {
-  int state = STATE_START;
-  int colons = 0, nums = 0, double_colon = 0;
-  const char *sp = NULL;
-  struct sockaddr_in6 sin6_dummy;
   int ret;
+  struct sockaddr_in6 sin6_dummy;
 
   if (str == NULL)
     return partly_match;
