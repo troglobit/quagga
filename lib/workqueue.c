@@ -170,6 +170,7 @@ DEFUN(show_work_queues,
       SHOW_STR
       "Work Queue information\n")
 {
+  struct list *work = &work_queues;
   struct listnode *node;
   struct work_queue *wq;
   
@@ -187,7 +188,7 @@ DEFUN(show_work_queues,
            "Name", 
            VTY_NEWLINE);
  
-  for (ALL_LIST_ELEMENTS_RO ((&work_queues), node, wq))
+  for (ALL_LIST_ELEMENTS_RO (work, node, wq))
     {
       vty_out (vty,"%c %8d %5d %8ld %7d %6d %6u %s%s",
                (CHECK_FLAG (wq->flags, WQ_UNPLUGGED) ? ' ' : 'P'),
