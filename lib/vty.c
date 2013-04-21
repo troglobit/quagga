@@ -2290,19 +2290,30 @@ vty_use_backup_config (char *fullpath)
   sav = open (fullpath_sav, O_RDONLY);
   if (sav < 0)
     {
+      close (tmp);
       unlink (fullpath_tmp);
       free (fullpath_sav);
       free (fullpath_tmp);
       return NULL;
     }
   
-  while((c = read (sav, buffer, 512)) > 0)
-    write (tmp, buffer, c);
+  while ((c = read (sav, buffer, 512)) > 0)
+    {
+      if (write (tmp, buffer, c) < 0)
+        {
+          close (sav);
+          close (tmp);
+          unlink (fullpath_tmp);
+          free (fullpath_sav);
+          free (fullpath_tmp);
+          return NULL;
+        }
+    }
   
   close (sav);
   close (tmp);
   
-  if (chmod(fullpath_tmp, CONFIGFILE_MASK) != 0)
+  if (chmod (fullpath_tmp, CONFIGFILE_MASK) != 0)
     {
       unlink (fullpath_tmp);
       free (fullpath_sav);
@@ -2331,33 +2342,41 @@ vty_read_config (char *config_file,
   char *tmp = NULL;
 
   /* If -f flag specified. */
-  if (config_file != NULL)
+  if (!config_file)
     {
       if (! IS_DIRECTORY_SEP (config_file[0]))
         {
-          getcwd (cwd, MAXPATHLEN);
-          tmp = XMALLOC (MTYPE_TMP, 
- 			      strlen (cwd) + strlen (config_file) + 2);
-          sprintf (tmp, "%s/%s", cwd, config_file);
+          char *c = getcwd (cwd, MAXPATHLEN);
+          size_t len;
+
+          if (!c)
+            snprintf (cwd, sizeof(cwd), SYSCONFDIR);
+
+          len = strlen (cwd) + strlen (config_file) + 2;
+          tmp = XMALLOC (MTYPE_TMP, len);
+          snprintf (tmp, len, "%s/%s", cwd, config_file);
           fullpath = tmp;
         }
       else
-        fullpath = config_file;
+        {
+          fullpath = config_file;
+        }
 
       confp = fopen (fullpath, "r");
-
-      if (confp == NULL)
+      if (!confp)
         {
           fprintf (stderr, "%s: failed to open configuration file %s: %s\n",
                    __func__, fullpath, safe_strerror (errno));
           
           confp = vty_use_backup_config (fullpath);
           if (confp)
-            fprintf (stderr, "WARNING: using backup configuration file!\n");
+            {
+              fprintf (stderr, "WARNING: using backup configuration file!\n");
+            }
           else
             {
-              fprintf (stderr, "can't open configuration file [%s]\n", 
-  	               config_file);
+              fprintf (stderr, "Failed opening configuration file %s: %s\n",
+	               config_file, safe_strerror (errno));
               exit(1);
             }
         }
@@ -2447,8 +2466,9 @@ vty_log (const char *level, const char *proto_str,
 
 /* Async-signal-safe version of vty_log for fixed strings. */
 void
-vty_log_fixed (const char *buf, size_t len)
+vty_log_fixed (char *buf, size_t len)
 {
+  char eol[] = "\r\n";
   unsigned int i;
   struct iovec iov[2];
 
@@ -2456,18 +2476,20 @@ vty_log_fixed (const char *buf, size_t len)
   if (!vtyvec)
     return;
   
-  iov[0].iov_base = (void *)buf;
-  iov[0].iov_len = len;
-  iov[1].iov_base = (void *)"\r\n";
-  iov[1].iov_len = 2;
+  iov[0].iov_base = buf;
+  iov[0].iov_len  = len;
+  iov[1].iov_base = eol;
+  iov[1].iov_len  = 2;
 
   for (i = 0; i < vector_active (vtyvec); i++)
     {
+      ssize_t retv = 0;
+
       struct vty *vty;
       if (((vty = vector_slot (vtyvec, i)) != NULL) && vty->monitor)
 	/* N.B. We don't care about the return code, since process is
 	   most likely just about to die anyway. */
-	writev(vty->fd, iov, 2);
+	retv += writev (vty->fd, iov, 2);
     }
 }
 
@@ -2908,15 +2930,17 @@ vty_reset ()
 static void
 vty_save_cwd (void)
 {
-  char cwd[MAXPATHLEN];
+  int retv;
   char *c;
+  char cwd[MAXPATHLEN];
 
   c = getcwd (cwd, MAXPATHLEN);
-
   if (!c)
     {
-      chdir (SYSCONFDIR);
-      getcwd (cwd, MAXPATHLEN);
+      retv = chdir (SYSCONFDIR);
+      if (-1 == retv)
+        retv = chdir ("/");
+      c = getcwd (cwd, MAXPATHLEN);
     }
 
   vty_cwd = XMALLOC (MTYPE_TMP, strlen (cwd) + 1);
