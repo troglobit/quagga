@@ -270,7 +270,6 @@ extern int if_is_loopback (struct interface *);
 extern int if_is_broadcast (struct interface *);
 extern int if_is_pointopoint (struct interface *);
 extern int if_is_multicast (struct interface *);
-extern int if_default_mtu (struct interface *);
 extern void if_add_hook (int, int (*)(struct interface *));
 extern void if_init (void);
 extern void if_terminate (void);

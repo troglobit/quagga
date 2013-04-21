@@ -354,6 +354,9 @@ if_add_update (struct interface *ifp)
   else if (if_data->multicast == IF_ZEBRA_MULTICAST_OFF)
     if_unset_flags (ifp, IFF_MULTICAST);
 
+  if (if_data->mtu != 0)
+    if_set_mtu (ifp, if_data->mtu);
+
   zebra_interface_add_update (ifp);
 
   if (! CHECK_FLAG (ifp->status, ZEBRA_INTERFACE_ACTIVE))
@@ -969,29 +972,21 @@ DEFUN (show_interface_desc,
 
 DEFUN (mtu_set,
        mtu_set_cmd,
-       "mtu <68-16436>",
-       "Set MTU, usually 1500 for Ethernet, 16436 for loopback\n")
+       "mtu <68-65536>",
+       "Set max packet size, or max transmission unit, MTU, in bytes.\n")
 {
-  int mtu, max;
+  int mtu;
   struct interface *ifp;
   struct zebra_if *if_data;
 
-  ifp = (struct interface *)vty->index;
-  max = if_default_mtu (ifp);
-
   mtu = strtol (argv[0], NULL, 10);
-  if (mtu < 68 || mtu > max)
-    {
-      vty_out (vty, "MTU %d is invalid for this interface [68, %d]%s",
-               mtu, max, VTY_NEWLINE);
-      return CMD_WARNING;
-    }
+  ifp = (struct interface *)vty->index;
 
   if (CHECK_FLAG (ifp->status, ZEBRA_INTERFACE_ACTIVE))
     {
       if (if_set_mtu (ifp, mtu) < 0)
         {
-          vty_out (vty, "Can't set MTU%s", VTY_NEWLINE);
+          vty_out (vty, "Failed setting MTU: %s%s", safe_strerror (errno), VTY_NEWLINE);
           return CMD_WARNING;
         }
     }
@@ -1006,26 +1001,16 @@ DEFUN (no_mtu_set,
        no_mtu_set_cmd,
        "no mtu",
        NO_STR
-       "Reset MTU to default for interface\n")
+       "Unset MTU configuration for interface\n")
 {
-  int mtu;
   struct interface *ifp;
   struct zebra_if *if_data;
 
   ifp = (struct interface *)vty->index;
-  mtu = if_default_mtu (ifp);
-
-  if (CHECK_FLAG (ifp->status, ZEBRA_INTERFACE_ACTIVE))
-    {
-      if (if_set_mtu (ifp, mtu) < 0)
-        {
-          vty_out (vty, "Can't restore default MTU (%d)%s", VTY_NEWLINE, mtu);
-          return CMD_WARNING;
-        }
-    }
-
   if_data = ifp->info;
   if_data->mtu = 0;
+
+  vty_out (vty, "Warning: 'no mtu' does not restore the interface's default MTU%s", VTY_NEWLINE);
 
   return CMD_SUCCESS;
 }

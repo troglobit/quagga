@@ -148,14 +148,14 @@ if_set_mtu (struct interface *ifp, int mtu)
 #if defined(SIOCGIFDATA)
   if (if_ioctl (SIOCGIFDATA, (caddr_t) &ifreq) < 0)
     {
-      zlog (NULL, LOG_INFO, "Can't lookup mtu by ioctl(SIOCGIFDATA)");
+      zlog (NULL, LOG_INFO, "Failed reading ifdata %s MTU: %s", ifp->name, safe_strerror (errno));
       return -1;
     }
 
   ((struct if_data *)ifreq.ifr_data)->ifi_mtu = mtu;
   if (if_ioctl (SIOCSIFDATA, (caddr_t) &ifreq) < 0)
     {
-      zlog (NULL, LOG_INFO, "Can't set mtu by ioctl(SIOCSIFDATA)");
+      zlog_info ("Failed writing ifdata %s MTU %d: %s", ifp->name, mtu, safe_strerror (errno));
       return -1;
     }
 
@@ -164,7 +164,7 @@ if_set_mtu (struct interface *ifp, int mtu)
 #elif defined(SIOCGIFMTU)
   if (if_ioctl (SIOCGIFMTU, (caddr_t) &ifreq) < 0)
     {
-      zlog_info ("Can't lookup mtu by ioctl(SIOCGIFMTU)");
+      zlog_info ("Failed querying interface %s MTU: %s", ifp->name, safe_strerror (errno));
       return -1;
     }
 
@@ -176,14 +176,14 @@ if_set_mtu (struct interface *ifp, int mtu)
 
   if (if_ioctl (SIOCSIFMTU, (caddr_t) &ifreq) < 0)
     {
-      zlog_info ("Can't set mtu by ioctl(SIOCSIFMTU)");
+      zlog_info ("Failed setting interface %s MTU %d: %s", ifp->name, mtu, safe_strerror (errno));
       return -1;
     }
 
   ifp->mtu = mtu;
 
 #else
-  zlog (NULL, LOG_INFO, "Can't set mtu on this system");
+  zlog_info ("Cannot set interface %s MTU %d on this system", ifp->name);
 #endif
 
   return 0;
@@ -200,7 +200,7 @@ if_get_mtu (struct interface *ifp)
 #if defined(SIOCGIFMTU)
   if (if_ioctl (SIOCGIFMTU, (caddr_t) & ifreq) < 0) 
     {
-      zlog_info ("Can't lookup mtu by ioctl(SIOCGIFMTU)");
+      zlog_info ("Failed querying interface %s MTU: %s", ifp->name, safe_strerror (errno));
       ifp->mtu6 = ifp->mtu = -1;
       return;
     }
@@ -215,7 +215,7 @@ if_get_mtu (struct interface *ifp)
   zebra_interface_up_update(ifp);
 
 #else
-  zlog (NULL, LOG_INFO, "Can't lookup mtu on this system");
+  zlog_info ("Cannot read interface %s MTU on this system", ifp->name);
   ifp->mtu6 = ifp->mtu = -1;
 #endif
 }

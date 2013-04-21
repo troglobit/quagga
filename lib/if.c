@@ -378,19 +378,6 @@ if_is_multicast (struct interface *ifp)
   return ifp->flags & IFF_MULTICAST;
 }
 
-/* Attempt to guess default MTU for interface */
-int
-if_default_mtu (struct interface *ifp)
-{
-  if (if_is_loopback (ifp))
-    return 16436;
-
-  if (if_is_pointopoint (ifp))
-    return 1492;
-
-  return 1500;
-}
-
 /* Printout flag information into log */
 const char *
 if_flag_dump (unsigned long flag)
