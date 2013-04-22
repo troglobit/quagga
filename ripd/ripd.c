@@ -2903,6 +2903,7 @@ DEFUN (rip_route,
        "IP prefix <network>/<length>\n")
 {
   int ret;
+  char info[] = "static";
   struct prefix_ipv4 p;
   struct route_node *node;
 
@@ -2924,7 +2925,7 @@ DEFUN (rip_route,
       return CMD_WARNING;
     }
 
-  node->info = (char *)"static";
+  node->info = info;
 
   rip_redistribute_add (ZEBRA_ROUTE_RIP, RIP_ROUTE_STATIC, &p, 0, NULL, 0, 0);
 
@@ -3166,12 +3167,11 @@ rip_distance_set (struct vty *vty, const char *distance_str, const char *ip_str,
 }
 
 static int
-rip_distance_unset (struct vty *vty, const char *distance_str,
+rip_distance_unset (struct vty *vty, const char *distance_str __attribute__ ((unused)),
 		    const char *ip_str, const char *access_list_str)
 {
   int ret;
   struct prefix_ipv4 p;
-  u_char distance;
   struct route_node *rn;
   struct rip_distance *rdistance;
 
@@ -3181,8 +3181,6 @@ rip_distance_unset (struct vty *vty, const char *distance_str,
       vty_out (vty, "Malformed prefix%s", VTY_NEWLINE);
       return CMD_WARNING;
     }
-
-  distance = atoi (distance_str);
 
   rn = route_node_lookup (rip_distance_table, (struct prefix *)&p);
   if (! rn)
