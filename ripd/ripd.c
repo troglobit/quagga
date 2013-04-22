@@ -1684,16 +1684,6 @@ rip_request_process (struct rip_packet *packet, int size,
       ntohs (rte->family) == 0 &&
       ntohl (rte->metric) == RIP_METRIC_INFINITY)
     {	
-      struct prefix_ipv4 saddr;
-
-      /* saddr will be used for determining which routes to split-horizon.
-         Since the source address we'll pick will be on the same subnet as the
-         destination, for the purpose of split-horizoning, we'll
-         pretend that "from" is our source address.  */
-      saddr.family = AF_INET;
-      saddr.prefixlen = IPV4_MAX_BITLEN;
-      saddr.prefix = from->sin_addr;
-
       /* All route with split horizon */
       rip_output_process (ifc, from, rip_all_route, packet->version);
     }
