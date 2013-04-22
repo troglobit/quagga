@@ -822,6 +822,7 @@ rip_enable_network_lookup2 (struct connected *connected)
 static int
 rip_enable_network_add (struct prefix *p)
 {
+  char info[] = "enabled";
   struct route_node *node;
 
   node = route_node_get (rip_enable_network, p);
@@ -831,8 +832,8 @@ rip_enable_network_add (struct prefix *p)
       route_unlock_node (node);
       return -1;
     }
-  else
-    node->info = (char *) "enabled";
+
+  node->info = info;
 
   /* XXX: One should find a better solution than a generic one */
   rip_enable_apply_all();
