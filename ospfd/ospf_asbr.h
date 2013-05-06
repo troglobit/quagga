@@ -76,5 +76,8 @@ extern void ospf_schedule_asbr_check (void);
 extern void ospf_asbr_route_install_lsa (struct ospf_lsa *);
 extern struct ospf_lsa *ospf_external_info_find_lsa (struct ospf *,
 					      struct prefix_ipv4 *p);
+extern int ospf_asbr_remove_unapproved_external_lsa (struct ospf *ospf,
+					     struct ospf_lsa *lsa);
+extern struct ospf_external_summary_prefixes *external_summary_prefixes_new (void);
 
 #endif /* _ZEBRA_OSPF_ASBR_H */

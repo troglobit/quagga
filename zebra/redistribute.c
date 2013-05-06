@@ -255,6 +255,20 @@ zebra_redistribute_add (int command, struct zserv *client, int length)
     }
 }
 
+/*slighty edited copy of zebra_redistribute_add allowing us to request already redistributed routes - needed for external summarization*/
+void
+zebra_redistribute_refresh (int command, struct zserv *client, int length)
+{
+  int type;
+  type = stream_getc (client->ibuf);
+
+  if (type == 0 || type >= ZEBRA_ROUTE_MAX)
+    return;
+
+      client->redist[type] = 1;
+      zebra_redistribute (client, type);
+}
+
 void
 zebra_redistribute_delete (int command, struct zserv *client, int length)
 {

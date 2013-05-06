@@ -1343,6 +1343,9 @@ zebra_client_read (struct thread *thread)
     case ZEBRA_REDISTRIBUTE_DELETE:
       zebra_redistribute_delete (command, client, length);
       break;
+    case ZEBRA_REDISTRIBUTE_REFRESH:
+      zebra_redistribute_refresh (command, client, length);
+      break;
     case ZEBRA_REDISTRIBUTE_DEFAULT_ADD:
       zebra_redistribute_default_add (command, client, length);
       break;

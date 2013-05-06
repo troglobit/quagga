@@ -31,6 +31,7 @@
 #include "plist.h"
 #include "log.h"
 #include "zclient.h"
+#include "linklist.h"
 
 #include "ospfd/ospfd.h"
 #include "ospfd/ospf_asbr.h"
@@ -683,6 +684,231 @@ DEFUN (no_ospf_area_range_substitute,
 
   ospf_area_range_substitute_unset (ospf, area_id, &p);
 
+  return CMD_SUCCESS;
+}
+
+/*SUMMARIZATION */
+DEFUN (summary_address,
+       summary_address_cmd,
+       "summary-address A.B.C.D/M",
+       "Configure IP address summaries\n"
+       "IP Summary Address\n")
+{
+  struct ospf *ospf = vty->index;
+  struct prefix_ipv4 p;
+  struct external_info *ei;
+  struct ospf_lsa *lsa;
+  struct route_node *rn;
+  struct in_addr nexthop;
+  struct ospf_external_summary_prefixes *prefixes;
+  struct listnode *node, *nnode;
+
+  VTY_GET_IPV4_PREFIX ("summary address", p, argv[0]);
+
+  /*We shouldn't allow default route as summary*/
+  if (is_prefix_default (&p))
+    {
+      vty_out (vty,"Default route as summary not allowed %s", VTY_NEWLINE);
+      return CMD_SUCCESS;
+    }
+  /*check for already configured summary prefix*/
+  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+    {
+      if (prefix_ipv4_same (&prefixes->p,&p) && prefixes->advertise==1)
+        {
+          vty_out (vty,"Summary route for %s already added. %s",inet_ntoa (p.prefix), VTY_NEWLINE);
+          return CMD_SUCCESS;
+        }/*if it exists, however it's not advertised, originate summary LSA-5*/
+      else if (prefix_ipv4_same (&prefixes->p,&p) && prefixes->advertise==0)
+        {
+          prefixes->advertise=1;
+          if (prefixes->subprefixes>0)
+            {
+              ei = ospf_external_info_add ((u_char)NULL, p, (int)NULL, nexthop);
+              if (ei)
+                {
+                  struct ospf_lsa *current;
+                  current = ospf_external_info_find_lsa (ospf, &ei->p);
+                  if (!current)
+                    {
+                      lsa = ospf_external_lsa_originate (ospf, ei);
+                      prefixes->lsa = lsa;
+                      ospf_zebra_add_discard (&prefixes->p);
+                    }
+                  else if (IS_LSA_MAXAGE (current))
+                    {
+                      lsa = ospf_external_lsa_refresh (ospf, current,
+                                                       ei, LSA_REFRESH_FORCE);
+                      prefixes->lsa = lsa;
+                      ospf_zebra_add_discard (&prefixes->p);
+                    }
+                }
+            }
+          return CMD_SUCCESS;
+        }
+    }
+  /*if prefix hasn't been configured yet, make a new structure for it*/
+  prefixes=external_summary_prefixes_new ();
+  prefixes->advertise=1;
+  prefixes->subprefixes=0;
+  PREFIX_COPY_IPV4(&prefixes->p,&p);
+  /*flush all LSA matching this prefix, and consequently increase subprefixes counter*/
+  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+  {
+    if (IS_LSA_SELF (lsa) && !IS_LSA_MAXAGE (lsa) && prefix_ipv4_match (&p,&rn->p))
+      {
+        UNSET_FLAG (lsa->flags, OSPF_LSA_APPROVED);
+        prefixes->subprefixes++;
+      }
+  }/*if there was one or more prefixes in lsdb matching summary prefix, originate summary LSA-5*/
+  if (prefixes->subprefixes>0)
+    {
+      ei = ospf_external_info_add ((u_char)NULL, p, (int)NULL, nexthop);
+      if (ei)
+        {
+          struct ospf_lsa *current;
+          current = ospf_external_info_find_lsa (ospf, &ei->p);
+          if (!current)
+            {
+              lsa = ospf_external_lsa_originate (ospf, ei);
+              prefixes->lsa = lsa;
+              ospf_zebra_add_discard (&p);
+          }
+          else if (IS_LSA_MAXAGE (current))
+            {
+              lsa = ospf_external_lsa_refresh (ospf, current,
+                                               ei, LSA_REFRESH_FORCE);
+              prefixes->lsa = lsa;
+              ospf_zebra_add_discard (&p);
+            }
+        }
+      LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+      ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
+    }
+  listnode_add (ospf->external_summary_prefixes,prefixes);
+  if (IS_DEBUG_OSPF_EVENT)
+    vty_out (vty,"Summary route for %s added. %s",inet_ntoa (p.prefix), VTY_NEWLINE);
+  return CMD_SUCCESS;
+}
+
+ALIAS (summary_address,
+       summary_address_advertise_cmd,
+       "summary-address A.B.C.D/M advertise",
+       "Configure IP address summaries\n"
+       "IP Summary Address\n"
+       "Advertise this summary prefix (default)")
+
+DEFUN (no_summary_address,
+       no_summary_address_cmd,
+       "no summary-address A.B.C.D/M",
+       NO_STR
+       "Configure IP address summaries\n"
+       "IP Summary Address\n")
+{
+  struct ospf *ospf = vty->index;
+  struct prefix_ipv4 p;
+  struct ospf_lsa *lsa;
+  struct route_node *rn;
+  int i;
+  struct ospf_external_summary_prefixes *prefixes;
+  struct listnode *node, *nnode;
+  VTY_GET_IPV4_PREFIX ("summary address", p, argv[0]);
+  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+    {
+      if (prefix_ipv4_same (&prefixes->p,&p))
+        {
+          vty_out (vty,"prefix deleted: %s %s",inet_ntoa (prefixes->p.prefix), VTY_NEWLINE);
+          /*if stated prefix is configured and advertised, prepare it's LSA for flush*/
+          if (prefixes->advertise==1)
+            {
+              UNSET_FLAG (prefixes->lsa->flags, OSPF_LSA_APPROVED);
+              ospf_zebra_delete_discard (&prefixes->p);
+              listnode_delete (ospf->external_summary_prefixes, prefixes);
+            }
+          if (prefixes->advertise==0)
+            {
+              ospf_zebra_delete_discard (&prefixes->p);
+              listnode_delete (ospf->external_summary_prefixes, prefixes);
+            }
+          /*Request again routes from redistributed protocol to get back previously summarized LSAs.*/
+          for (i=0; i<=ZEBRA_ROUTE_MAX; i++)
+            {
+              if (ospf_is_type_redistributed (i))
+                {
+                  if (zclient->sock > 0)
+                    zebra_redistribute_send (ZEBRA_REDISTRIBUTE_REFRESH, zclient, i);
+                }
+            }/*flush summary LSA*/
+          LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+          ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
+          return CMD_SUCCESS;
+        }
+    }
+  vty_out (vty,"Not such a summarry address %s", VTY_NEWLINE);
+  return CMD_SUCCESS;
+}
+
+ALIAS (no_summary_address,
+       no_summary_address_advertise_cmd,
+       "no summary-address A.B.C.D/M advertise",
+       NO_STR
+       "Configure IP address summaries\n"
+       "IP Summary Address\n")
+
+ALIAS (no_summary_address,
+       no_summary_address_not_advertise_cmd,
+       "no summary-address A.B.C.D/M not-advertise",
+       NO_STR
+       "Configure IP address summaries\n"
+       "IP Summary Address\n")
+
+DEFUN (summary_address_not_advertise,
+       summary_address_not_advertise_cmd,
+       "summary-address A.B.C.D/M not-advertise",
+       "Configure IP address summaries\n"
+       "IP Summary Address\n"
+       "Do not advertise this summary prefix\n")
+{
+  struct ospf *ospf = vty->index;
+  struct prefix_ipv4 p;
+  struct ospf_lsa *lsa;
+  struct ospf_external_summary_prefixes *prefixes;
+  struct route_node *rn;
+  struct listnode *node, *nnode;
+  VTY_GET_IPV4_PREFIX ("summarry address", p, argv[0]);
+  /*if summary prefix is configured, flush his LSA*/
+  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+    {
+      if (prefix_ipv4_same (&prefixes->p,&p) && prefixes->advertise==1)
+        {
+          prefixes->advertise=0;
+          UNSET_FLAG (prefixes->lsa->flags, OSPF_LSA_APPROVED);
+          LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+            ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
+          ospf_zebra_delete_discard (&prefixes->p);
+          return CMD_SUCCESS;
+        }
+      else if (prefix_ipv4_same (&prefixes->p,&p) && prefixes->advertise==0)
+        {
+          return CMD_SUCCESS;
+        }
+    }
+  /*if summary prefix isnt configured, make new structure for it, add it to list, but dont advertise it's LSA*/
+  prefixes=external_summary_prefixes_new ();
+  prefixes->advertise=0;
+  PREFIX_COPY_IPV4 (&prefixes->p,&p);
+  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+  {
+    if (IS_LSA_SELF (lsa) && !IS_LSA_MAXAGE (lsa) && prefix_ipv4_match (&p,&rn->p))
+      {
+        UNSET_FLAG (lsa->flags, OSPF_LSA_APPROVED);
+        prefixes->subprefixes++;
+      }
+  }
+  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+    ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
+  listnode_add (ospf->external_summary_prefixes,prefixes);
+  vty_out (vty,"Summary route for %s added and not advertised %s",inet_ntoa (p.prefix), VTY_NEWLINE);
   return CMD_SUCCESS;
 }
 
@@ -7112,7 +7338,8 @@ static int
 config_write_ospf_redistribute (struct vty *vty, struct ospf *ospf)
 {
   int type;
-
+  struct ospf_external_summary_prefixes *prefixes;
+  struct listnode *node, *nnode;
   /* redistribute print. */
   for (type = 0; type < ZEBRA_ROUTE_MAX; type++)
     if (type != zclient->redist_default && zclient->redist[type])
@@ -7129,6 +7356,14 @@ config_write_ospf_redistribute (struct vty *vty, struct ospf *ospf)
 	
         vty_out (vty, "%s", VTY_NEWLINE);
       }
+  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+    {
+      if(prefixes->advertise==1)
+        vty_out (vty," summary-address %s/%d %s",inet_ntoa(prefixes->p.prefix),prefixes->p.prefixlen, VTY_NEWLINE);
+      if(prefixes->advertise==0)
+        vty_out (vty," summary-address %s/%d not-advertise %s",inet_ntoa(prefixes->p.prefix),prefixes->p.prefixlen, VTY_NEWLINE);
+    }
+
 
   return 0;
 }
@@ -7713,6 +7948,14 @@ ospf_vty_init (void)
   install_element (OSPF_NODE, &no_ospf_neighbor_cmd);
   install_element (OSPF_NODE, &no_ospf_neighbor_priority_cmd);
   install_element (OSPF_NODE, &no_ospf_neighbor_poll_interval_cmd);
+
+  /*External Summarization*/
+  install_element (OSPF_NODE, &summary_address_cmd);
+  install_element (OSPF_NODE, &summary_address_advertise_cmd);
+  install_element (OSPF_NODE, &summary_address_not_advertise_cmd);
+  install_element (OSPF_NODE, &no_summary_address_cmd);
+  install_element (OSPF_NODE, &no_summary_address_advertise_cmd);
+  install_element (OSPF_NODE, &no_summary_address_not_advertise_cmd);
 
   /* Init interface related vty commands. */
   ospf_vty_if_init ();

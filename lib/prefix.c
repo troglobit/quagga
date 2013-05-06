@@ -241,6 +241,35 @@ prefix_match (const struct prefix *n, const struct prefix *p)
   return 1;
 }
 
+/* If n includes p prefix then return 1 else return 0. */
+int
+prefix_ipv4_match (const struct prefix_ipv4 *n, const struct prefix_ipv4 *p)
+{
+  int offset;
+  int shift;
+  const u_char *np, *pp;
+
+  /* If n's prefix is longer than p's one return 0. */
+  if (n->prefixlen >= p->prefixlen)
+    return 0;
+
+  /* Set both prefix's head pointer. */
+  np = (const u_char *)&n->prefix;
+  pp = (const u_char *)&p->prefix;
+
+  offset = n->prefixlen / PNBBY;
+  shift =  n->prefixlen % PNBBY;
+
+  if (shift)
+    if (maskbit[shift] & (np[offset] ^ pp[offset]))
+      return 0;
+
+  while (offset--)
+    if (np[offset] != pp[offset])
+      return 0;
+  return 1;
+}
+
 /* Copy prefix from src to dest. */
 void
 prefix_copy (struct prefix *dest, const struct prefix *src)
@@ -288,6 +317,18 @@ prefix_same (const struct prefix *p1, const struct prefix *p2)
 	if (IPV6_ADDR_SAME (&p1->u.prefix6.s6_addr, &p2->u.prefix6.s6_addr))
 	  return 1;
 #endif /* HAVE_IPV6 */
+    }
+  return 0;
+}
+
+int
+prefix_ipv4_same (const struct prefix_ipv4 *p1, const struct prefix_ipv4 *p2)
+{
+  if (p1->family == p2->family && p1->prefixlen == p2->prefixlen)
+    {
+      if (p1->family == AF_INET)
+      if (IPV4_ADDR_SAME (&p1->prefix.s_addr, &p2->prefix.s_addr))
+    	  return 1;
     }
   return 0;
 }

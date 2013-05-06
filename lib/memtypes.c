@@ -211,6 +211,7 @@ struct memory_list memory_list_ospf[] =
   { MTYPE_OSPF_IF_INFO,       "OSPF if info"			},
   { MTYPE_OSPF_IF_PARAMS,     "OSPF if params"			},
   { MTYPE_OSPF_MESSAGE,		"OSPF message"			},
+  { MTYPE_OSPF_EXT_SUMMARY,	"OSPF External Summary"		},
   { -1, NULL },
 };
 

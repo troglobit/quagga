@@ -34,10 +34,13 @@
 #include "filter.h"
 #include "plist.h"
 #include "log.h"
+#include "linklist.h"
 
 #include "ospfd/ospfd.h"
 #include "ospfd/ospf_interface.h"
 #include "ospfd/ospf_ism.h"
+#include "ospfd/ospf_lsa.h"
+#include "ospfd/ospf_lsdb.h"
 #include "ospfd/ospf_asbr.h"
 #include "ospfd/ospf_asbr.h"
 #include "ospfd/ospf_abr.h"
@@ -825,6 +828,10 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
   struct prefix_ipv4 p;
   struct external_info *ei;
   struct ospf *ospf;
+  struct ospf_lsa *lsa;
+  struct route_node *rn;
+  struct ospf_external_summary_prefixes *prefixes;
+  struct listnode *node, *nnode;
 
   s = zclient->ibuf;
   ifindex = 0;
@@ -840,7 +847,6 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
   p.family = AF_INET;
   p.prefixlen = stream_getc (s);
   stream_get (&p.prefix, s, PSIZE (p.prefixlen));
-
   if (IPV4_NET127(ntohl(p.prefix.s_addr)))
     return 0;
 
@@ -877,7 +883,49 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
        *     || CHECK_FLAG (api.flags, ZEBRA_FLAG_REJECT))
        * return 0;
        */
-        
+	  /*Check if route match one of configured summary routes*/
+      for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+        {
+          if (prefix_ipv4_match (&prefixes->p,&p) && prefixes->advertise==1)
+            {
+              /*If it matches, increment subprefixes counter of that prefix*/
+              prefixes->subprefixes++;
+              /*If this is first route matching summary prefix and prefix is
+               * advertised, originate summary LSA-5 for that prefix */
+              if (prefixes->subprefixes==1)
+                {
+                  ei = ospf_external_info_add (api.type, prefixes->p, ifindex, nexthop);
+                  if (ei)
+                    {
+                      struct ospf_lsa *current;
+                      current = ospf_external_info_find_lsa (ospf, &ei->p);
+                      if (!current)
+                        {
+                          lsa = ospf_external_lsa_originate (ospf, ei);
+                          prefixes->lsa = lsa;
+                          ospf_zebra_add_discard(&prefixes->p);
+                        }
+                      else if (IS_LSA_MAXAGE (current))
+                        {
+                          lsa = ospf_external_lsa_refresh (ospf, current,
+                                                           ei, LSA_REFRESH_FORCE);
+                          prefixes->lsa = lsa;
+                          ospf_zebra_add_discard(&prefixes->p);
+                        }
+                      else
+                        zlog_warn ("ospf_zebra_read_ipv4() : %s already exists",
+                                   inet_ntoa (p.prefix));
+                    }
+                }
+              return 0;
+            }/*If there is match, but prefix is not advertised, just icrement counter*/
+          else if (prefix_ipv4_match (&prefixes->p,&p) && prefixes->advertise==0)
+            {
+              prefixes->subprefixes++;
+              return 0;
+            }
+        }
+	  /*if route doesn't match any summary prefix, normally originate LSA-5*/
       ei = ospf_external_info_add (api.type, p, ifindex, nexthop);
 
       if (ospf->router_id.s_addr == 0)
@@ -893,7 +941,6 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
               else
                 {
                   struct ospf_lsa *current;
-
                   current = ospf_external_info_find_lsa (ospf, &ei->p);
                   if (!current)
                     ospf_external_lsa_originate (ospf, ei);
@@ -908,7 +955,29 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
         }
     }
   else                          /* if (command == ZEBRA_IPV4_ROUTE_DELETE) */
-    {
+    {/*check if route match configured summary prefix*/
+      for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+        {
+          /*if it matches, and prefix is advertised, decrement subprefixes counter*/
+          if (prefix_ipv4_match (&prefixes->p,&p) && prefixes->advertise==1)
+            {
+              prefixes->subprefixes--;
+              /*if this was the last route matching summary advertised prefix, flush summary LSA-5*/
+              if (prefixes->subprefixes==0)
+                {
+                  UNSET_FLAG (prefixes->lsa->flags, OSPF_LSA_APPROVED);
+                  ospf_zebra_delete_discard (&prefixes->p);
+                  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+                  ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
+                }
+              return 0;
+            }/*if route matches not advertised summary prefix, only decrement subprefixes counter*/
+            else if (prefix_ipv4_match (&prefixes->p,&p) && prefixes->advertise==0)
+              {
+                prefixes->subprefixes--;
+                return 0;
+              }
+        }
       ospf_external_info_delete (api.type, p);
       if (is_prefix_default (&p))
         ospf_external_lsa_refresh_default (ospf);

@@ -28,6 +28,7 @@
 
 extern void zebra_redistribute_add (int, struct zserv *, int);
 extern void zebra_redistribute_delete (int, struct zserv *, int);
+extern void zebra_redistribute_refresh (int, struct zserv *, int);
 
 extern void zebra_redistribute_default_add (int, struct zserv *, int);
 extern void zebra_redistribute_default_delete (int, struct zserv *, int);

@@ -291,3 +291,28 @@ ospf_redistribute_withdraw (struct ospf *ospf, u_char type)
 	    rn->info = NULL;
 	  }
 }
+
+int
+ospf_asbr_remove_unapproved_external_lsa (struct ospf *ospf,
+					     struct ospf_lsa *lsa)
+{
+  if (!CHECK_FLAG (lsa->flags, OSPF_LSA_APPROVED))
+    {
+      zlog_info ("ospf_asbr_remove_external_lsa(): "
+		 "removing unapproved external LSA, ID: %s",
+		 inet_ntoa (lsa->data->id));
+
+      /* FLUSH THROUGHOUT AS */
+      ospf_lsa_flush_as (ospf, lsa);
+    }
+  return 0;
+}
+
+/* Allocate new ospf_summary_prefixes structure. */
+struct ospf_external_summary_prefixes *
+external_summary_prefixes_new ()
+{
+  struct ospf_external_summary_prefixes *p;
+  p = XCALLOC (MTYPE_OSPF_EXT_SUMMARY, sizeof *p);
+  return p;
+}

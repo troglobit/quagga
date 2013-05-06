@@ -177,6 +177,9 @@ struct ospf
   int external_origin;			/* AS-external-LSA origin flag. */
   int ase_calc;				/* ASE calculation flag. */
 
+  /*List for external prefix structures*/
+  struct list *external_summary_prefixes;
+
 #ifdef HAVE_OPAQUE_LSA
   struct list *opaque_lsa_self;		/* Type-11 Opaque-LSAs */
 #endif /* HAVE_OPAQUE_LSA */
@@ -434,6 +437,15 @@ struct ospf_nbr_nbma
 
   /* State change. */
   u_int32_t state_change;
+};
+
+/*Main structure for configured external summary prefixes*/
+struct ospf_external_summary_prefixes
+{
+  u_char advertise;
+  struct prefix_ipv4 p;
+  int subprefixes;
+  struct ospf_lsa *lsa;
 };
 
 /* Macro. */
