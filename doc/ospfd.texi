@@ -572,12 +572,13 @@ redistributed into OSPF (@pxref{OSPF redistribute}).
 @deffnx {OSPF Command} {summary-address a.b.c.d/m advertise} {}
 @deffnx {OSPF Command} {summary-address a.b.c.d/m not-advertise} {}
 @deffnx {OSPF Command} {no summary-address a.b.c.d/m} {}
-Summarize external redistributed routes. Originate summary
-AS-External (type-5) LSA instead of specific LSAs matching summary address.
+Summarize externally redistributed routes.  Originate summary
+AS-External (type-5) LSA instead of specific LSAs matching summary
+address.
 
-Argument not-advertise is used to disable advertising of configured
-summary prefix and all redistributed routes matching this prefix.
-(Idea taken from Cisco devices).
+With the not-advertise argument the summary address can be used to
+filter out matching routes, effectively preventing them from being
+advertised.
 @end deffn
 
 @node Showing OSPF information

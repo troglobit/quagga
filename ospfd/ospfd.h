@@ -439,7 +439,7 @@ struct ospf_nbr_nbma
   u_int32_t state_change;
 };
 
-/*Main structure for configured external summary prefixes*/
+/* OSPF summary address structure. */
 struct ospf_external_summary_prefixes
 {
   u_char advertise;

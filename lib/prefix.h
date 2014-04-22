@@ -173,10 +173,6 @@ extern struct prefix *sockunion2prefix (const union sockunion *dest,
 extern struct prefix *sockunion2hostprefix (const union sockunion *);
 extern void prefix2sockunion (const struct prefix *, union sockunion *);
 
-/*New functions made for use in external summarization process*/
-extern int prefix_ipv4_match (const struct prefix_ipv4 *,const struct prefix_ipv4 *);
-extern int prefix_ipv4_same (const struct prefix_ipv4 *, const struct prefix_ipv4 *);
-
 extern struct prefix_ipv4 *prefix_ipv4_new (void);
 extern void prefix_ipv4_free (struct prefix_ipv4 *);
 extern int str2prefix_ipv4 (const char *, struct prefix_ipv4 *);
