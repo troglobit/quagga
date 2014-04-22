@@ -308,11 +308,10 @@ ospf_asbr_remove_unapproved_external_lsa (struct ospf *ospf,
   return 0;
 }
 
-/* Allocate new ospf_summary_prefixes structure. */
-struct ospf_external_summary_prefixes *
-external_summary_prefixes_new ()
+struct ospf_summary_address *
+ospf_asbr_summary_address_new (void)
 {
-  struct ospf_external_summary_prefixes *p;
-  p = XCALLOC (MTYPE_OSPF_EXT_SUMMARY, sizeof *p);
-  return p;
+  struct ospf_summary_address *p;
+
+  return XCALLOC (MTYPE_OSPF_EXT_SUMMARY, sizeof (*p));
 }

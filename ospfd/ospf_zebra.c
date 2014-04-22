@@ -829,7 +829,7 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
   struct ospf *ospf;
   struct ospf_lsa *lsa;
   struct route_node *rn;
-  struct ospf_external_summary_prefixes *prefixes;
+  struct ospf_summary_address *prefixes;
   struct listnode *node, *nnode;
 
   s = zclient->ibuf;
@@ -883,7 +883,7 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
        * return 0;
        */
 	  /*Check if route match one of configured summary routes*/
-      for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+      for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, prefixes))
         {
           if (prefix_match ((struct prefix *) &prefixes->p, (struct prefix *) &p))
             {
@@ -957,7 +957,7 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
   else                          /* if (command == ZEBRA_IPV4_ROUTE_DELETE) */
     {
       /* Check if route match configured summary prefix */
-      for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+      for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, prefixes))
         {
           /* if it matches, and prefix is advertised, decrement subprefixes counter */
           if (prefix_match ((struct prefix *) &prefixes->p, (struct prefix *) &p))

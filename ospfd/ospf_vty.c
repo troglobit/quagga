@@ -699,30 +699,30 @@ DEFUN (summary_address,
   struct ospf_lsa *lsa;
   struct route_node *rn;
   struct in_addr nexthop;
-  struct ospf_external_summary_prefixes *prefixes;
+  struct ospf_summary_address *sa;
   struct listnode *node, *nnode;
 
   VTY_GET_IPV4_PREFIX ("summary address", p, argv[0]);
   if (is_prefix_default (&p))
     {
-      vty_out (vty,"Default route as summary not allowed %s", VTY_NEWLINE);
+      vty_out (vty, "Default route as summary not allowed!%s", VTY_NEWLINE);
       return CMD_SUCCESS;
     }
 
   /* Check for already configured summary prefix */
-  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+  for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, sa))
     {
-      if (prefix_same ((struct prefix *) &prefixes->p, (struct prefix *) &p))
+      if (prefix_same ((struct prefix *) &sa->p, (struct prefix *) &p))
         {
-          if (prefixes->advertise)
+          if (sa->advertise)
             {
-              vty_out (vty,"Summary route for %s already added. %s",inet_ntoa (p.prefix), VTY_NEWLINE);
+              vty_out (vty, "Summary route for %s already added.%s", inet_ntoa (p.prefix), VTY_NEWLINE);
               return CMD_SUCCESS;
             }
 
           /* If it exists, although not advertised, originate summary LSA-5 */
-          prefixes->advertise = 1;
-          if (prefixes->subprefixes > 0)
+          sa->advertise = 1;
+          if (sa->subprefixes > 0)
             {
               ei = ospf_external_info_add (ZEBRA_ROUTE_OSPF, p, 0, nexthop);
               if (ei)
@@ -733,15 +733,15 @@ DEFUN (summary_address,
                   if (!current)
                     {
                       lsa = ospf_external_lsa_originate (ospf, ei);
-                      prefixes->lsa = lsa;
-                      ospf_zebra_add_discard (&prefixes->p);
+                      sa->lsa = lsa;
+                      ospf_zebra_add_discard (&sa->p);
                     }
                   else if (IS_LSA_MAXAGE (current))
                     {
                       lsa = ospf_external_lsa_refresh (ospf, current,
                                                        ei, LSA_REFRESH_FORCE);
-                      prefixes->lsa = lsa;
-                      ospf_zebra_add_discard (&prefixes->p);
+                      sa->lsa = lsa;
+                      ospf_zebra_add_discard (&sa->p);
                     }
                 }
             }
@@ -751,10 +751,10 @@ DEFUN (summary_address,
     }
 
   /* No configured yet, make a new structure for it */
-  prefixes = external_summary_prefixes_new ();
-  prefixes->advertise = 1;
-  prefixes->subprefixes = 0;
-  PREFIX_COPY_IPV4(&prefixes->p, &p);
+  sa = ospf_asbr_summary_address_new ();
+  sa->advertise = 1;
+  sa->subprefixes = 0;
+  PREFIX_COPY_IPV4(&sa->p, &p);
 
   /* Flush all LSA's matching prefix, and consequently increase subprefixes counter */
   LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
@@ -762,12 +762,12 @@ DEFUN (summary_address,
       if (IS_LSA_SELF (lsa) && !IS_LSA_MAXAGE (lsa) && prefix_match ((struct prefix *) &p, &rn->p))
         {
           UNSET_FLAG (lsa->flags, OSPF_LSA_APPROVED);
-          prefixes->subprefixes++;
+          sa->subprefixes++;
         }
     }
 
   /* For all lsdb matches, originate summary LSA-5 */
-  if (prefixes->subprefixes > 0)
+  if (sa->subprefixes > 0)
     {
       ei = ospf_external_info_add (ZEBRA_ROUTE_OSPF, p, 0, nexthop);
       if (ei)
@@ -778,14 +778,14 @@ DEFUN (summary_address,
           if (!current)
             {
               lsa = ospf_external_lsa_originate (ospf, ei);
-              prefixes->lsa = lsa;
+              sa->lsa = lsa;
               ospf_zebra_add_discard (&p);
           }
           else if (IS_LSA_MAXAGE (current))
             {
               lsa = ospf_external_lsa_refresh (ospf, current,
                                                ei, LSA_REFRESH_FORCE);
-              prefixes->lsa = lsa;
+              sa->lsa = lsa;
               ospf_zebra_add_discard (&p);
             }
         }
@@ -794,9 +794,9 @@ DEFUN (summary_address,
       ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
     }
 
-  listnode_add (ospf->external_summary_prefixes,prefixes);
+  listnode_add (ospf->summary_addresses, sa);
   if (IS_DEBUG_OSPF_EVENT)
-    vty_out (vty,"Summary route for %s added. %s", inet_ntoa (p.prefix), VTY_NEWLINE);
+    vty_out (vty, "Summary route for %s added.%s", inet_ntoa (p.prefix), VTY_NEWLINE);
 
   return CMD_SUCCESS;
 }
@@ -820,22 +820,22 @@ DEFUN (no_summary_address,
   struct ospf_lsa *lsa;
   struct route_node *rn;
   int i;
-  struct ospf_external_summary_prefixes *prefixes;
+  struct ospf_summary_address *sa;
   struct listnode *node, *nnode;
 
   VTY_GET_IPV4_PREFIX ("summary address", p, argv[0]);
-  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+  for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, sa))
     {
-      if (prefix_same ((struct prefix *) &prefixes->p, (struct prefix *) &p))
+      if (prefix_same ((struct prefix *) &sa->p, (struct prefix *) &p))
         {
-          vty_out (vty,"prefix deleted: %s %s",inet_ntoa (prefixes->p.prefix), VTY_NEWLINE);
+          vty_out (vty, "prefix deleted: %s%s", inet_ntoa (sa->p.prefix), VTY_NEWLINE);
 
           /* Prefix is configured and advertised, prepare its LSA for flush */
-          if (prefixes->advertise)
-              UNSET_FLAG (prefixes->lsa->flags, OSPF_LSA_APPROVED);
+          if (sa->advertise)
+              UNSET_FLAG (sa->lsa->flags, OSPF_LSA_APPROVED);
 
-          ospf_zebra_delete_discard (&prefixes->p);
-          listnode_delete (ospf->external_summary_prefixes, prefixes);
+          ospf_zebra_delete_discard (&sa->p);
+          listnode_delete (ospf->summary_addresses, sa);
 
           /* Request refresh of redistributed routes, to get previously summarized LSAs */
           for (i = 0; i <= ZEBRA_ROUTE_MAX; i++)
@@ -855,7 +855,7 @@ DEFUN (no_summary_address,
         }
     }
 
-  vty_out (vty,"Not such a summarry address %s", VTY_NEWLINE);
+  vty_out (vty, "No matching summary address found.%s", VTY_NEWLINE);
 
   return CMD_SUCCESS;
 }
@@ -884,22 +884,22 @@ DEFUN (summary_address_not_advertise,
   struct ospf *ospf = vty->index;
   struct prefix_ipv4 p;
   struct ospf_lsa *lsa;
-  struct ospf_external_summary_prefixes *prefixes;
+  struct ospf_summary_address *sa;
   struct route_node *rn;
   struct listnode *node, *nnode;
 
   VTY_GET_IPV4_PREFIX ("summary address", p, argv[0]);
-  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
+  for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, sa))
     {
-      if (prefix_same ((struct prefix *) &prefixes->p, (struct prefix *) &p))
+      if (prefix_same ((struct prefix *) &sa->p, (struct prefix *) &p))
         {
-          if (prefixes->advertise)
+          if (sa->advertise)
             {
-              prefixes->advertise = 0;
-              UNSET_FLAG (prefixes->lsa->flags, OSPF_LSA_APPROVED);
+              sa->advertise = 0;
+              UNSET_FLAG (sa->lsa->flags, OSPF_LSA_APPROVED);
               LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
                 ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
-              ospf_zebra_delete_discard (&prefixes->p);
+              ospf_zebra_delete_discard (&sa->p);
             }
 
           return CMD_SUCCESS;
@@ -907,24 +907,24 @@ DEFUN (summary_address_not_advertise,
     }
 
   /* if summary prefix isnt configured, make new structure for it, add it to list, but dont advertise it's LSA */
-  prefixes = external_summary_prefixes_new ();
-  prefixes->advertise = 0;
-  PREFIX_COPY_IPV4 (&prefixes->p, &p);
+  sa = ospf_asbr_summary_address_new ();
+  sa->advertise = 0;
+  PREFIX_COPY_IPV4 (&sa->p, &p);
 
   LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
   {
     if (IS_LSA_SELF (lsa) && !IS_LSA_MAXAGE (lsa) && prefix_match ((struct prefix *) &p, &rn->p))
       {
         UNSET_FLAG (lsa->flags, OSPF_LSA_APPROVED);
-        prefixes->subprefixes++;
+        sa->subprefixes++;
       }
   }
 
   LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
     ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
-  listnode_add (ospf->external_summary_prefixes, prefixes);
+  listnode_add (ospf->summary_addresses, sa);
 
-  vty_out (vty,"Summary route for %s added and not advertised %s", inet_ntoa (p.prefix), VTY_NEWLINE);
+  vty_out (vty, "Summary route for %s added, not advertised.%s", inet_ntoa (p.prefix), VTY_NEWLINE);
 
   return CMD_SUCCESS;
 }
@@ -7355,8 +7355,7 @@ static int
 config_write_ospf_redistribute (struct vty *vty, struct ospf *ospf)
 {
   int type;
-  struct ospf_external_summary_prefixes *prefixes;
-  struct listnode *node, *nnode;
+
   /* redistribute print. */
   for (type = 0; type < ZEBRA_ROUTE_MAX; type++)
     if (type != zclient->redist_default && zclient->redist[type])
@@ -7373,14 +7372,24 @@ config_write_ospf_redistribute (struct vty *vty, struct ospf *ospf)
 	
         vty_out (vty, "%s", VTY_NEWLINE);
       }
-  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
-    {
-      if(prefixes->advertise==1)
-        vty_out (vty," summary-address %s/%d %s",inet_ntoa(prefixes->p.prefix),prefixes->p.prefixlen, VTY_NEWLINE);
-      if(prefixes->advertise==0)
-        vty_out (vty," summary-address %s/%d not-advertise %s",inet_ntoa(prefixes->p.prefix),prefixes->p.prefixlen, VTY_NEWLINE);
-    }
 
+  return 0;
+}
+
+static int
+config_write_ospf_summary_address (struct vty *vty, struct ospf *ospf)
+{
+  struct ospf_summary_address *sa;
+  struct listnode *node, *nnode;
+
+  for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, sa))
+    {
+      vty_out (vty, " summary-address %s/%d", inet_ntoa (sa->p.prefix), sa->p.prefixlen);
+      if (!sa->advertise)
+        vty_out (vty, " not-advertise");
+
+      vty_out (vty, "%s", VTY_NEWLINE);
+    }
 
   return 0;
 }
@@ -7540,6 +7549,8 @@ ospf_config_write (struct vty *vty)
 
       /* Redistribute information print. */
       config_write_ospf_redistribute (vty, ospf);
+
+      config_write_ospf_summary_address (vty, ospf);
 
       /* passive-interface print. */
       if (ospf->passive_interface_default == OSPF_IF_PASSIVE)

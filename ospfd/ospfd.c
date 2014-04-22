@@ -233,7 +233,7 @@ ospf_new (void)
     }
   new->t_read = thread_add_read (master, ospf_read, new, new->fd);
   new->oi_write_q = list_new ();
-  new->external_summary_prefixes = list_new ();
+  new->summary_addresses = list_new ();
   
   return new;
 }
@@ -405,7 +405,7 @@ ospf_finish_final (struct ospf *ospf)
   struct ospf_interface *oi;
   struct ospf_area *area;
   struct ospf_vl_data *vl_data;
-  struct ospf_external_summary_prefixes *prefixes;
+  struct ospf_summary_address *prefixes;
   struct listnode *node, *nnode;
   int i;
 
@@ -556,9 +556,10 @@ ospf_finish_final (struct ospf *ospf)
 	  rn->info = NULL;
 	  route_unlock_node (rn);
 	}
-  for (ALL_LIST_ELEMENTS (ospf->external_summary_prefixes, node, nnode, prefixes))
-    listnode_delete (ospf->external_summary_prefixes, prefixes);
-  list_delete(ospf->external_summary_prefixes);
+
+  for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, prefixes))
+    listnode_delete (ospf->summary_addresses, prefixes);
+  list_delete(ospf->summary_addresses);
 
 
   ospf_distance_reset (ospf);
