@@ -309,9 +309,101 @@ ospf_asbr_remove_unapproved_external_lsa (struct ospf *ospf,
 }
 
 struct ospf_summary_address *
-ospf_asbr_summary_address_new (void)
+ospf_asbr_summary_address_find (struct ospf *ospf, struct prefix_ipv4 *p)
 {
-  struct ospf_summary_address *p;
+  struct ospf_summary_address *sa;
+  struct listnode *node, *nnode;
 
-  return XCALLOC (MTYPE_OSPF_EXT_SUMMARY, sizeof (*p));
+  for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, sa))
+    {
+      if (prefix_same ((struct prefix *) &sa->p, (struct prefix *) &p))
+        return sa;
+    }
+
+  return NULL;
+}
+
+int
+ospf_asbr_summary_address_add (struct ospf *ospf, struct prefix_ipv4 *p, int advertise)
+{
+  struct ospf_lsa *lsa;
+  struct route_node *rn;
+  struct ospf_summary_address *sa;
+
+  sa = XCALLOC (MTYPE_OSPF_EXT_SUMMARY, sizeof (*sa));
+  sa->advertise = 1;
+  PREFIX_COPY_IPV4(&sa->p, p);
+
+  /* Flush all LSA's matching prefix, and consequently increase subprefixes counter */
+  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+    {
+      if (IS_LSA_SELF (lsa) && !IS_LSA_MAXAGE (lsa) && prefix_match ((struct prefix *) p, &rn->p))
+        {
+          UNSET_FLAG (lsa->flags, OSPF_LSA_APPROVED);
+          sa->subprefixes++;
+        }
+    }
+
+  /* For all lsdb matches, originate summary LSA-5 */
+  if (advertise && sa->subprefixes > 0)
+    {
+      struct in_addr nexthop;
+      struct external_info *ei;
+
+      nexthop.s_addr = 0;
+      ei = ospf_external_info_add (ZEBRA_ROUTE_OSPF, *p, 0, nexthop);
+      if (ei)
+        {
+          struct ospf_lsa *current;
+
+          current = ospf_external_info_find_lsa (ospf, &ei->p);
+          if (!current)
+            {
+              lsa = ospf_external_lsa_originate (ospf, ei);
+              sa->lsa = lsa;
+              ospf_zebra_add_discard (p);
+          }
+          else if (IS_LSA_MAXAGE (current))
+            {
+              lsa = ospf_external_lsa_refresh (ospf, current,
+                                               ei, LSA_REFRESH_FORCE);
+              sa->lsa = lsa;
+              ospf_zebra_add_discard (p);
+            }
+        }
+    }
+
+  /* Flush summary LSA */
+  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+    {
+      ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
+    }
+
+  listnode_add (ospf->summary_addresses, sa);
+
+  return 0;
+}
+
+int
+ospf_asbr_summary_address_delete (struct ospf *ospf, struct prefix_ipv4 *p)
+{
+  struct ospf_summary_address *sa;
+
+  sa = ospf_asbr_summary_address_find (ospf, p);
+  if (!sa)
+    return 1;
+
+  /* Prefix is configured and advertised, prepare its LSA for flush */
+  if (sa->advertise)
+    UNSET_FLAG (sa->lsa->flags, OSPF_LSA_APPROVED);
+
+  ospf_zebra_delete_discard (&sa->p);
+  listnode_delete (ospf->summary_addresses, sa);
+
+  /* Flush unapproved summary LSAs */
+  ospf_summary_list_update (ospf);
+
+  XFREE (MTYPE_OSPF_EXT_SUMMARY, sa);
+
+  return 0;
 }

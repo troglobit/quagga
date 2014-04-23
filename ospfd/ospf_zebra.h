@@ -55,6 +55,7 @@ extern int ospf_redistribute_check (struct ospf *, struct external_info *,
 extern int ospf_distribute_check_connected (struct ospf *,
 					    struct external_info *);
 extern void ospf_distribute_list_update (struct ospf *, uintptr_t);
+extern void ospf_summary_list_update (struct ospf *);
 
 extern int ospf_is_type_redistributed (int);
 extern void ospf_distance_reset (struct ospf *);

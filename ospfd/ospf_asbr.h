@@ -78,6 +78,9 @@ extern struct ospf_lsa *ospf_external_info_find_lsa (struct ospf *,
 					      struct prefix_ipv4 *p);
 extern int ospf_asbr_remove_unapproved_external_lsa (struct ospf *ospf,
 					     struct ospf_lsa *lsa);
-extern struct ospf_summary_address *ospf_asbr_summary_address_new (void);
+
+extern struct ospf_summary_address *ospf_asbr_summary_address_find (struct ospf *ospf, struct prefix_ipv4 *p);
+extern int ospf_asbr_summary_address_add (struct ospf *ospf, struct prefix_ipv4 *p, int advertise);
+extern int ospf_asbr_summary_address_delete (struct ospf *ospf, struct prefix_ipv4 *p);
 
 #endif /* _ZEBRA_OSPF_ASBR_H */

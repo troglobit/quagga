@@ -177,7 +177,7 @@ struct ospf
   int external_origin;			/* AS-external-LSA origin flag. */
   int ase_calc;				/* ASE calculation flag. */
 
-  struct list *summary_addresses;       /* List of ASBR external route summaries. */
+  struct list *summary_addresses;       /* ASBR external route summaries. */
 
 #ifdef HAVE_OPAQUE_LSA
   struct list *opaque_lsa_self;		/* Type-11 Opaque-LSAs */

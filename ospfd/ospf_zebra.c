@@ -829,8 +829,7 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
   struct ospf *ospf;
   struct ospf_lsa *lsa;
   struct route_node *rn;
-  struct ospf_summary_address *prefixes;
-  struct listnode *node, *nnode;
+  struct ospf_summary_address *sa;
 
   s = zclient->ibuf;
   ifindex = 0;
@@ -882,50 +881,47 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
        *     || CHECK_FLAG (api.flags, ZEBRA_FLAG_REJECT))
        * return 0;
        */
-	  /*Check if route match one of configured summary routes*/
-      for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, prefixes))
+
+      sa = ospf_asbr_summary_address_find (ospf, &p);
+      if (sa)
         {
-          if (prefix_match ((struct prefix *) &prefixes->p, (struct prefix *) &p))
+          sa->subprefixes++;
+
+          if (sa->advertise)
             {
-              /* If it matches, increment subprefixes counter of that prefix */
-              prefixes->subprefixes++;
-
-              if (prefixes->advertise)
+              /* If this is first route matching summary prefix and prefix is
+               * advertised, originate summary LSA-5 for that prefix */
+              if (sa->subprefixes == 1)
                 {
-                  /* If this is first route matching summary prefix and prefix is
-                   * advertised, originate summary LSA-5 for that prefix */
-                  if (prefixes->subprefixes == 1)
+                  ei = ospf_external_info_add (api.type, sa->p, ifindex, nexthop);
+                  if (ei)
                     {
-                      ei = ospf_external_info_add (api.type, prefixes->p, ifindex, nexthop);
-                      if (ei)
-                        {
-                          struct ospf_lsa *current;
+                      struct ospf_lsa *current;
 
-                          current = ospf_external_info_find_lsa (ospf, &ei->p);
-                          if (!current)
-                            {
-                              lsa = ospf_external_lsa_originate (ospf, ei);
-                              prefixes->lsa = lsa;
-                              ospf_zebra_add_discard (&prefixes->p);
-                            }
-                          else if (IS_LSA_MAXAGE (current))
-                            {
-                              lsa = ospf_external_lsa_refresh (ospf, current,
-                                                               ei, LSA_REFRESH_FORCE);
-                              prefixes->lsa = lsa;
-                              ospf_zebra_add_discard (&prefixes->p);
-                            }
-                          else
-                            zlog_warn ("ospf_zebra_read_ipv4() : %s already exists",
-                                       inet_ntoa (p.prefix));
+                      current = ospf_external_info_find_lsa (ospf, &ei->p);
+                      if (!current)
+                        {
+                          lsa = ospf_external_lsa_originate (ospf, ei);
+                          sa->lsa = lsa;
+                          ospf_zebra_add_discard (&sa->p);
                         }
+                      else if (IS_LSA_MAXAGE (current))
+                        {
+                          lsa = ospf_external_lsa_refresh (ospf, current,
+                                                           ei, LSA_REFRESH_FORCE);
+                          sa->lsa = lsa;
+                          ospf_zebra_add_discard (&sa->p);
+                        }
+                      else
+                        zlog_warn ("ospf_zebra_read_ipv4() : %s already exists",
+                                   inet_ntoa (p.prefix));
                     }
                 }
-
-              return 0;
             }
+
+          return 0;
         }
-	  /*if route doesn't match any summary prefix, normally originate LSA-5*/
+
       ei = ospf_external_info_add (api.type, p, ifindex, nexthop);
 
       if (ospf->router_id.s_addr == 0)
@@ -956,25 +952,23 @@ ospf_zebra_read_ipv4 (int command, struct zclient *zclient,
     }
   else                          /* if (command == ZEBRA_IPV4_ROUTE_DELETE) */
     {
-      /* Check if route match configured summary prefix */
-      for (ALL_LIST_ELEMENTS (ospf->summary_addresses, node, nnode, prefixes))
+      sa = ospf_asbr_summary_address_find (ospf, &p);
+      if (sa)
         {
-          /* if it matches, and prefix is advertised, decrement subprefixes counter */
-          if (prefix_match ((struct prefix *) &prefixes->p, (struct prefix *) &p))
-            {
-              prefixes->subprefixes--;
+          sa->subprefixes--;
 
-              /* if this was the last route matching summary advertised prefix, flush summary LSA-5 */
-              if (prefixes->advertise && prefixes->subprefixes == 0)
+          /* Last route matching summary advertised prefix? => flush summary LSA-5 */
+          if (sa->advertise && sa->subprefixes == 0)
+            {
+              UNSET_FLAG (sa->lsa->flags, OSPF_LSA_APPROVED);
+              ospf_zebra_delete_discard (&sa->p);
+              LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
                 {
-                  UNSET_FLAG (prefixes->lsa->flags, OSPF_LSA_APPROVED);
-                  ospf_zebra_delete_discard (&prefixes->p);
-                  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
                   ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
                 }
-
-              return 0;
             }
+
+          return 0;
         }
 
       ospf_external_info_delete (api.type, p);
@@ -1214,6 +1208,30 @@ ospf_prefix_list_update (struct prefix_list *plist)
   /* Schedule ABR task. */
   if (IS_OSPF_ABR (ospf) && abr_inv)
     ospf_schedule_abr_task (ospf);
+}
+
+void
+ospf_summary_list_update (struct ospf *ospf)
+{
+  int type;
+  struct ospf_lsa *lsa;
+  struct route_node *rn;
+
+  /* Request refresh of redistributed routes, to get previously summarized LSAs */
+  for (type = 0; type <= ZEBRA_ROUTE_MAX; type++)
+    {
+      if (ospf_is_type_redistributed (type))
+        {
+          if (zclient->sock > 0)
+            zebra_redistribute_send (ZEBRA_REDISTRIBUTE_REFRESH, zclient, type);
+        }
+    }
+
+  /* Flush summary LSA */
+  LSDB_LOOP (EXTERNAL_LSDB (ospf), rn, lsa)
+    {
+      ospf_asbr_remove_unapproved_external_lsa (ospf, lsa);
+    }
 }
 
 static struct ospf_distance *
